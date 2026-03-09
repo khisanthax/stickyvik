@@ -3,11 +3,12 @@ export type PanelSortMode = 'vikunja' | 'dueDate' | 'priority' | 'newest' | 'old
 export type PanelFilterMode = 'open' | 'dueToday' | 'overdue' | 'dueEmphasis';
 export type PanelDisplayMode = 'full' | 'minimized' | 'edge-docked';
 export type DockEdge = 'left' | 'right' | 'top' | 'bottom';
-export type WindowView = 'manager' | 'panel';
+export type WindowView = 'manager' | 'panel' | 'details';
 
 export interface WindowContext {
   view: WindowView;
   panelId?: string;
+  taskId?: number;
 }
 
 export interface VikunjaProject {
@@ -131,6 +132,14 @@ export interface PanelBootstrap {
   sync: SyncState;
 }
 
+export interface DetailsBootstrap {
+  window: WindowContext;
+  panel: PanelConfig;
+  task: VikunjaTask;
+  projects: VikunjaProject[];
+  sync: SyncState;
+}
+
 export interface TestConnectionResult {
   ok: boolean;
   message: string;
@@ -141,6 +150,7 @@ export interface StickyVikBridge {
   getWindowContext: () => Promise<WindowContext>;
   getManagerBootstrap: () => Promise<ManagerBootstrap>;
   getPanelBootstrap: (panelId: string) => Promise<PanelBootstrap>;
+  getDetailsBootstrap: (panelId: string, taskId: number) => Promise<DetailsBootstrap>;
   saveSettings: (input: SaveSettingsInput) => Promise<ManagerBootstrap>;
   testConnection: (input: ConnectionTestInput) => Promise<TestConnectionResult>;
   syncNow: () => Promise<void>;
@@ -150,6 +160,7 @@ export interface StickyVikBridge {
   showManager: () => Promise<void>;
   showAllPanels: () => Promise<void>;
   hideAllPanels: () => Promise<void>;
+  openTaskDetails: (panelId: string, taskId: number) => Promise<void>;
   togglePauseAlwaysOnTop: () => Promise<void>;
   setPanelHoverState: (panelId: string, hovered: boolean) => Promise<void>;
   togglePanelMinimized: (panelId: string) => Promise<PanelConfig>;

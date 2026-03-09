@@ -1,7 +1,7 @@
-import { BrowserWindow, Rectangle, Tray, nativeImage, screen } from 'electron';
+import { BrowserWindow, Tray, nativeImage, screen } from 'electron';
 import path from 'node:path';
 
-import type { BoundsState, DockEdge, PanelConfig, WindowContext } from '../../shared/types';
+import type { BoundsState, PanelConfig, WindowContext } from '../../shared/types';
 
 const PANEL_MARGIN = 12;
 const TITLE_ONLY_HEIGHT = 52;
@@ -13,19 +13,27 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function getTargetDisplay(panel: PanelConfig) {
+function getNearestDisplay(panel: PanelConfig) {
+  const displays = screen.getAllDisplays();
   if (panel.monitorMode === 'selected' && panel.displayId) {
-    const match = screen.getAllDisplays().find((display) => display.id === panel.displayId);
-    if (match) {
-      return match;
+    const selected = displays.find((display) => display.id === panel.displayId);
+    if (selected) {
+      return selected;
     }
   }
 
-  return screen.getPrimaryDisplay();
+  const matching = screen.getDisplayMatching({
+    x: panel.bounds.x,
+    y: panel.bounds.y,
+    width: Math.max(panel.bounds.width, MIN_WIDTH),
+    height: Math.max(panel.bounds.height, MIN_HEIGHT)
+  });
+
+  return matching ?? screen.getPrimaryDisplay();
 }
 
 function getExpandedBounds(panel: PanelConfig) {
-  const display = getTargetDisplay(panel);
+  const display = getNearestDisplay(panel);
   const workArea = display.workArea;
   const raw = panel.bounds;
   const width = clamp(raw.width, MIN_WIDTH, Math.max(MIN_WIDTH, workArea.width - PANEL_MARGIN * 2));
@@ -42,13 +50,12 @@ function getExpandedBounds(panel: PanelConfig) {
 
 function getDockedBounds(panel: PanelConfig) {
   const expanded = getExpandedBounds(panel);
-  const display = getTargetDisplay(panel);
+  const display = getNearestDisplay(panel);
   const area = display.workArea;
   const expandedMode = panel.hoverExpanded;
 
-  // Edge-docked windows need to preserve their "true" size off to the side and
-  // then collapse only the axis that faces the desktop edge. That lets hover
-  // expansion feel anchored instead of jumping away from the chosen monitor edge.
+  // Edge-docked windows preserve their expanded rectangle and only collapse the
+  // axis facing the monitor edge so hover expansion stays anchored and stable.
   if (panel.dockEdge === 'left') {
     return {
       x: area.x,
@@ -145,6 +152,25 @@ export function createPanelWindow(panel: PanelConfig, pauseAlwaysOnTop: boolean)
   return window;
 }
 
+export function createDetailsWindow(parent?: BrowserWindow) {
+  return new BrowserWindow({
+    width: 460,
+    height: 560,
+    minWidth: 400,
+    minHeight: 480,
+    show: false,
+    autoHideMenuBar: true,
+    backgroundColor: '#13161b',
+    title: 'Task Details',
+    parent,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+}
+
 export function applyPanelWindowState(window: BrowserWindow, panel: PanelConfig, pauseAlwaysOnTop: boolean) {
   const bounds = resolvePanelBounds(panel);
   window.setBounds(bounds, true);
@@ -169,6 +195,10 @@ export function capturePanelBounds(window: BrowserWindow, panel: PanelConfig): B
   if (panel.displayMode === 'edge-docked' && !panel.hoverExpanded) {
     return {
       ...panel.bounds,
+      x: panel.bounds.x,
+      y: panel.bounds.y,
+      width: panel.bounds.width,
+      height: panel.bounds.height,
       displayId: display.id
     };
   }
@@ -196,16 +226,23 @@ export async function loadWindow(window: BrowserWindow, context: WindowContext) 
     if (context.panelId) {
       url.searchParams.set('panelId', context.panelId);
     }
+    if (context.taskId) {
+      url.searchParams.set('taskId', String(context.taskId));
+    }
 
     await window.loadURL(url.toString());
     return;
   }
 
-  await window.loadFile(path.resolve(process.cwd(), 'dist/index.html'), {
-    query: context.panelId
-      ? { view: context.view, panelId: context.panelId }
-      : { view: context.view }
-  });
+  const query: Record<string, string> = { view: context.view };
+  if (context.panelId) {
+    query.panelId = context.panelId;
+  }
+  if (context.taskId) {
+    query.taskId = String(context.taskId);
+  }
+
+  await window.loadFile(path.resolve(process.cwd(), 'dist/index.html'), { query });
 }
 
 export function makeTray() {

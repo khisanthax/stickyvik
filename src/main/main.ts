@@ -1,10 +1,20 @@
 import { app, BrowserWindow, ipcMain, Menu, Notification } from 'electron';
 
-import type { AppSettings, ManagerBootstrap, PanelBootstrap, PanelConfig, SyncState, WindowContext } from '../shared/types';
+import type {
+  AppSettings,
+  DetailsBootstrap,
+  ManagerBootstrap,
+  PanelBootstrap,
+  PanelConfig,
+  SyncState,
+  VikunjaTask,
+  WindowContext
+} from '../shared/types';
 import { clearStoredSecret, loadStoredSecret, saveStoredSecret } from './services/credentials';
 import {
   applyPanelWindowState,
   capturePanelBounds,
+  createDetailsWindow,
   createManagerWindow,
   createPanelWindow,
   loadWindow,
@@ -38,6 +48,7 @@ import {
 
 let managerWindow: BrowserWindow | null = null;
 const panelWindows = new Map<string, BrowserWindow>();
+const detailsWindows = new Map<string, BrowserWindow>();
 const windowContexts = new Map<number, WindowContext>();
 const hoverTimers = new Map<string, NodeJS.Timeout>();
 const notificationMemory = new Set<string>();
@@ -50,14 +61,14 @@ function getVisibleProjects() {
   const settings = getSettings();
   const projects = getProjects().filter((project) => !project.isArchived);
   if (settings.allowedProjectIds.length === 0) {
-    if (settings.includeSubprojects) {
-      return projects;
-    }
-
-    return projects.filter((project) => project.parentProjectId === null);
+    return settings.includeSubprojects ? projects : projects.filter((project) => project.parentProjectId === null);
   }
 
   return projects.filter((project) => settings.allowedProjectIds.includes(project.id));
+}
+
+function getDetailWindowKey(panelId: string, taskId: number) {
+  return `${panelId}:${taskId}`;
 }
 
 async function buildManagerBootstrap(): Promise<ManagerBootstrap> {
@@ -90,12 +101,44 @@ async function buildPanelBootstrap(panelId: string): Promise<PanelBootstrap> {
   };
 }
 
+async function buildDetailsBootstrap(panelId: string, taskId: number): Promise<DetailsBootstrap> {
+  const panel = getPanels().find((entry) => entry.id === panelId);
+  if (!panel) {
+    throw new Error(`Panel ${panelId} was not found`);
+  }
+
+  let task: VikunjaTask | null = null;
+  try {
+    task = await getTaskDetails(getSettings(), taskId);
+  } catch {
+    task = getTaskCache(panelId).find((entry) => entry.id === taskId) ?? null;
+  }
+
+  if (!task) {
+    throw new Error(`Task ${taskId} was not found`);
+  }
+
+  return {
+    window: { view: 'details', panelId, taskId },
+    panel,
+    task,
+    projects: getVisibleProjects(),
+    sync: getSyncState()
+  };
+}
+
 function invalidateState() {
   if (managerWindow && !managerWindow.isDestroyed()) {
     managerWindow.webContents.send('state:invalidated');
   }
 
   for (const window of panelWindows.values()) {
+    if (!window.isDestroyed()) {
+      window.webContents.send('state:invalidated');
+    }
+  }
+
+  for (const window of detailsWindows.values()) {
     if (!window.isDestroyed()) {
       window.webContents.send('state:invalidated');
     }
@@ -193,11 +236,10 @@ async function syncAll() {
       setTaskCache(panel.id, tasks);
     }
 
-    const now = new Date().toISOString();
     dispatchNotifications();
     setSyncState({
       status: 'ready',
-      lastSyncAt: now,
+      lastSyncAt: new Date().toISOString(),
       lastError: null
     });
   } catch (error) {
@@ -279,11 +321,38 @@ async function createOrShowPanelWindow(panel: PanelConfig) {
     if (!isQuitting && !suppressPanelDeletion) {
       setPanels(getPanels().filter((entry) => entry.id !== panel.id));
       removeTaskCache(panel.id);
+      for (const [key, detailsWindow] of detailsWindows.entries()) {
+        if (key.startsWith(`${panel.id}:`) && !detailsWindow.isDestroyed()) {
+          detailsWindow.close();
+        }
+      }
       invalidateState();
     }
   });
 
   await loadWindow(window, { view: 'panel', panelId: panel.id });
+  return window;
+}
+
+async function createOrShowDetailsWindow(panelId: string, taskId: number) {
+  const key = getDetailWindowKey(panelId, taskId);
+  const existing = detailsWindows.get(key);
+  if (existing && !existing.isDestroyed()) {
+    existing.show();
+    existing.focus();
+    return existing;
+  }
+
+  const parent = panelWindows.get(panelId);
+  const window = createDetailsWindow(parent);
+  detailsWindows.set(key, window);
+  windowContexts.set(window.webContents.id, { view: 'details', panelId, taskId });
+  window.on('ready-to-show', () => window.show());
+  window.on('closed', () => {
+    detailsWindows.delete(key);
+    windowContexts.delete(window.webContents.id);
+  });
+  await loadWindow(window, { view: 'details', panelId, taskId });
   return window;
 }
 
@@ -398,6 +467,11 @@ async function deletePanel(panelId: string) {
   suppressPanelDeletion = false;
   setPanels(getPanels().filter((panel) => panel.id !== panelId));
   removeTaskCache(panelId);
+  for (const [key, detailsWindow] of detailsWindows.entries()) {
+    if (key.startsWith(`${panelId}:`) && !detailsWindow.isDestroyed()) {
+      detailsWindow.close();
+    }
+  }
   invalidateState();
 }
 
@@ -423,13 +497,13 @@ async function handlePanelHover(panelId: string, hovered: boolean) {
     clearTimeout(existing);
   }
 
-  const timer = setTimeout(async () => {
+  const timer = setTimeout(() => {
     const current = getPanels().find((entry) => entry.id === panelId);
     if (!current) {
       return;
     }
 
-    const next = {
+    const next: PanelConfig = {
       ...current,
       hoverExpanded: hovered
     };
@@ -467,7 +541,6 @@ async function bootstrap() {
   ipcMain.handle('app:get-window-context', async (event) => {
     return windowContexts.get(event.sender.id) ?? { view: 'manager' };
   });
-
   ipcMain.handle('manager:get-bootstrap', async () => buildManagerBootstrap());
   ipcMain.handle('panel:get-bootstrap', async (_event, panelId: string) => {
     if (getTaskCache(panelId).length === 0) {
@@ -478,6 +551,9 @@ async function bootstrap() {
       }
     }
     return buildPanelBootstrap(panelId);
+  });
+  ipcMain.handle('details:get-bootstrap', async (_event, panelId: string, taskId: number) => {
+    return buildDetailsBootstrap(panelId, taskId);
   });
   ipcMain.handle('settings:test-connection', async (_event, payload) => {
     try {
@@ -512,6 +588,9 @@ async function bootstrap() {
   });
   ipcMain.handle('app:hide-all-panels', async () => {
     hideAllPanels();
+  });
+  ipcMain.handle('task:open-details', async (_event, panelId: string, taskId: number) => {
+    await createOrShowDetailsWindow(panelId, taskId);
   });
   ipcMain.handle('app:toggle-pause-always-on-top', async () => {
     await togglePauseAlwaysOnTop();
@@ -589,4 +668,3 @@ app.on('before-quit', () => {
 app.on('window-all-closed', () => {
   // The tray app stays resident even when all windows are closed.
 });
-

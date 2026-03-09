@@ -12,6 +12,7 @@ Implemented in the current branch:
 - Manager window with connection settings, allowed project selection, defaults, and persisted panel management
 - Secure credential storage via `keytar`
 - Multiple floating sticky panels with per-panel project selection, style overrides, minimized mode, and edge-docked hover-expand scaffolding
+- Native lightweight task details windows for title, project move, notes, and completion actions
 - Vikunja API client layer for test connection, project fetch, task fetch, create task, complete task, rename task, move task, and details fetch
 - Restore of saved panels and their monitor/bounds data on startup
 - Basic due-today and overdue desktop notifications
@@ -26,8 +27,8 @@ Implemented in the current branch:
 
 ## Architecture
 
-- `src/main`: Electron main process, secure credential handling, tray/controller behavior, Vikunja API client, state persistence, and panel window management
-- `src/renderer`: React manager UI and sticky panel UI backed by Zustand stores
+- `src/main`: Electron main process, secure credential handling, tray/controller behavior, Vikunja API client, state persistence, and panel/details window management
+- `src/renderer`: React manager UI, sticky panel UI, and native details-window UI backed by Zustand stores
 - `src/shared`: Typed contracts for IPC, settings, projects, tasks, and panels
 
 ## Configuration notes
@@ -42,11 +43,9 @@ Implemented in the current branch:
 - The Vikunja API layer is implemented against the common `/api/v1` endpoints and may need endpoint adjustments for older server versions
 - Edge-docked hover-expand is implemented as the window-management path, but still needs additional polish to reduce edge-case flicker
 - Notification rules currently cover basic due-today and overdue desktop notifications only
-- The details interaction is currently a lightweight modal instead of a separate native details window
 
 ## TODO after MVP
 
-- Native details window instead of modal
 - Per-panel desktop notifications and due-today / overdue reminders
 - Mirrored panels across all monitors
 - Snap-to-grid placement controls in the panel manager

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { PanelConfig, VikunjaTask } from '../../shared/types';
 import { useAppStore } from '../store/useAppStore';
-import { TaskDetailsModal } from './TaskDetailsModal';
 
 function formatDue(dateValue: string | null) {
   if (!dateValue) {
@@ -21,15 +20,13 @@ export function PanelView() {
   const createTask = useAppStore((state) => state.createTask);
   const toggleTaskDone = useAppStore((state) => state.toggleTaskDone);
   const renameTask = useAppStore((state) => state.renameTask);
-  const moveTask = useAppStore((state) => state.moveTask);
-  const getTaskDetails = useAppStore((state) => state.getTaskDetails);
+  const openTaskDetails = useAppStore((state) => state.openTaskDetails);
   const syncNow = useAppStore((state) => state.syncNow);
   const showManager = useAppStore((state) => state.showManager);
 
   const [taskDraft, setTaskDraft] = useState('');
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
-  const [detailsTask, setDetailsTask] = useState<VikunjaTask | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const clickTimer = useRef<number | null>(null);
 
@@ -55,14 +52,9 @@ export function PanelView() {
     opacity: panel.opacity
   };
 
-  async function openDetails(task: VikunjaTask) {
-    const details = await getTaskDetails(task.id);
-    setDetailsTask(details);
-  }
-
   function handleTaskClick(task: VikunjaTask) {
     clickTimer.current = window.setTimeout(() => {
-      void openDetails(task);
+      void openTaskDetails(panel.id, task.id);
     }, 180);
   }
 
@@ -248,19 +240,6 @@ export function PanelView() {
           <span>{panelBootstrap.tasks.length} open tasks</span>
         </section>
       )}
-
-      <TaskDetailsModal
-        task={detailsTask}
-        projects={projectOptions}
-        onClose={() => setDetailsTask(null)}
-        onComplete={(task) => {
-          void toggleTaskDone(panel.id, task.id, !task.done);
-          setDetailsTask(null);
-        }}
-        onMove={(task, projectId) => {
-          void moveTask(panel.id, task.id, projectId);
-        }}
-      />
     </div>
   );
 }

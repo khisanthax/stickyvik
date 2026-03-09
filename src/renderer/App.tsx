@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 
+import { DetailsView } from './components/DetailsView';
 import { ManagerView } from './components/ManagerView';
 import { PanelView } from './components/PanelView';
 import { useAppStore } from './store/useAppStore';
@@ -28,6 +29,10 @@ export function App() {
 
   if (context?.view === 'panel') {
     return <PanelView />;
+  }
+
+  if (context?.view === 'details') {
+    return <DetailsView />;
   }
 
   return <ManagerView />;

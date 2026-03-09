@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import type {
   AppSettings,
   ConnectionTestInput,
+  DetailsBootstrap,
   ManagerBootstrap,
   PanelBootstrap,
   PanelConfig,
@@ -14,6 +15,7 @@ interface AppStore {
   context: WindowContext | null;
   manager: ManagerBootstrap | null;
   panel: PanelBootstrap | null;
+  details: DetailsBootstrap | null;
   loading: boolean;
   error: string | null;
   testResult: { ok: boolean; message: string } | null;
@@ -29,6 +31,7 @@ interface AppStore {
   showManager: () => Promise<void>;
   showAllPanels: () => Promise<void>;
   hideAllPanels: () => Promise<void>;
+  openTaskDetails: (panelId: string, taskId: number) => Promise<void>;
   togglePanelMinimized: (panelId: string) => Promise<void>;
   setPanelHoverState: (panelId: string, hovered: boolean) => Promise<void>;
   createTask: (panelId: string, title: string) => Promise<void>;
@@ -42,6 +45,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   context: null,
   manager: null,
   panel: null,
+  details: null,
   loading: true,
   error: null,
   testResult: null,
@@ -61,16 +65,26 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const context = get().context ?? (await window.stickyVik.getWindowContext());
     if (context.view === 'manager') {
       const manager = await window.stickyVik.getManagerBootstrap();
-      set({ context, manager, panel: null });
+      set({ context, manager, panel: null, details: null });
       return;
     }
 
-    if (!context.panelId) {
-      throw new Error('Panel context is missing its panel id');
+    if (context.view === 'panel') {
+      if (!context.panelId) {
+        throw new Error('Panel context is missing its panel id');
+      }
+
+      const panel = await window.stickyVik.getPanelBootstrap(context.panelId);
+      set({ context, panel, manager: null, details: null });
+      return;
     }
 
-    const panel = await window.stickyVik.getPanelBootstrap(context.panelId);
-    set({ context, panel, manager: null });
+    if (!context.panelId || !context.taskId) {
+      throw new Error('Details context is missing its task or panel id');
+    }
+
+    const details = await window.stickyVik.getDetailsBootstrap(context.panelId, context.taskId);
+    set({ context, details, manager: null, panel: null });
   },
   saveSettings: async (settings, secret) => {
     set({ loading: true, error: null });
@@ -117,6 +131,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
   hideAllPanels: async () => {
     await window.stickyVik.hideAllPanels();
+  },
+  openTaskDetails: async (panelId, taskId) => {
+    await window.stickyVik.openTaskDetails(panelId, taskId);
   },
   togglePanelMinimized: async (panelId) => {
     await window.stickyVik.togglePanelMinimized(panelId);

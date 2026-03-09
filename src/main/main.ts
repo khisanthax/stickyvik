@@ -59,7 +59,7 @@ const detailsWindows = new Map<string, BrowserWindow>();
 const panelRuntime = new Map<string, PanelRuntimeState>();
 const windowContexts = new Map<number, WindowContext>();
 const notificationMemory = new Set<string>();
-let tray = makeTray();
+let tray: ReturnType<typeof makeTray> | null = null;
 let isQuitting = false;
 let syncTimer: NodeJS.Timeout | null = null;
 let suppressPanelDeletion = false;
@@ -514,6 +514,10 @@ function hideAllPanels() {
 }
 
 function updateTrayMenu() {
+  if (!tray) {
+    return;
+  }
+
   const settings = getSettings();
   const sync = getSyncState();
   tray.setToolTip(`Vikunja Sticky (${sync.status})`);
@@ -686,6 +690,7 @@ async function bootstrap() {
   await initStateStore();
   applyLoginItemSettings(getSettings());
   scheduleSync();
+  tray = makeTray();
   tray.on('double-click', () => void ensureManagerWindow());
   updateTrayMenu();
 

@@ -1,35 +1,51 @@
 # StickyVik
 
-StickyVik is a Windows-first Electron desktop panel for keeping Vikunja tasks pinned at the edge of the screen.
+Vikunja Sticky is a Windows-first Electron desktop companion for Vikunja. It combines a tray controller, a manager/settings window, and lightweight floating sticky panels that keep project tasks visible on the desktop.
 
-## Status
+## Current MVP status
 
-The repository currently contains the first milestone:
+Implemented in the current branch:
 
-- Electron + React + TypeScript application scaffold
-- Frameless always-on-top tray-backed panel window
-- Persistent local settings and panel bounds storage
-- Dock side and collapse controls in the renderer shell
+- Electron + React + TypeScript + Vite desktop scaffold
+- Secure preload bridge with isolated Electron main / preload / renderer separation
+- Tray controller with create panel, show/hide, sync, settings, pause always-on-top, and quit actions
+- Manager window with connection settings, allowed project selection, defaults, and persisted panel management
+- Secure credential storage via `keytar`
+- Multiple floating sticky panels with per-panel project selection, style overrides, minimized mode, and edge-docked hover-expand scaffolding
+- Vikunja API client layer for test connection, project fetch, task fetch, create task, complete task, rename task, move task, and details fetch
+- Restore of saved panels and their monitor/bounds data on startup
 
 ## Development
 
 1. Install dependencies with `npm install`
-2. Start the desktop app with `npm run dev`
-3. Build the app with `npm run build`
-4. Create a Windows package with `npm run dist`
+2. Rebuild native Electron dependencies with `npm run postinstall` if needed
+3. Start the app with `npm run dev`
+4. Build the app with `npm run build`
+5. Package Windows output with `npm run dist`
 
 ## Architecture
 
-- `src/main`: Electron main process, preload bridge, window/tray control, persistence
-- `src/renderer`: React UI rendered inside the sticky panel
-- `src/shared`: Typed contracts shared across process boundaries
+- `src/main`: Electron main process, secure credential handling, tray/controller behavior, Vikunja API client, state persistence, and panel window management
+- `src/renderer`: React manager UI and sticky panel UI backed by Zustand stores
+- `src/shared`: Typed contracts for IPC, settings, projects, tasks, and panels
 
-## Configuration
+## Configuration notes
 
-StickyVik stores its local state in Electron's `userData` directory as `stickyvik.settings.json`.
+- Vikunja server URL and non-secret app settings are stored locally in the app store
+- Credentials or tokens are stored with `keytar`
+- One Vikunja account/server is supported for MVP
+- The app targets Windows behavior first, including tray persistence and `openAtLogin`
 
-Planned next milestone:
+## Known limitations
 
-- Vikunja API connection test
-- Task fetching and sticky task rendering
-- Monitor-aware dock/restore improvements
+- The Vikunja API layer is implemented against the common `/api/v1` endpoints and may need endpoint adjustments for older server versions
+- Edge-docked hover-expand is implemented as the window-management path, but still needs additional polish to reduce edge-case flicker
+- Notification rules are scaffolded in settings but not yet surfaced as desktop notifications
+- The details interaction is currently a lightweight modal instead of a separate native details window
+
+## TODO after MVP
+
+- Native details window instead of modal
+- Per-panel desktop notifications and due-today / overdue reminders
+- Mirrored panels across all monitors
+- Snap-to-grid placement controls in the panel manager

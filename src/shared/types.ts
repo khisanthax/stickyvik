@@ -1,13 +1,42 @@
-export type DockSide = 'left' | 'right';
+export type AuthMethod = 'token' | 'password';
+export type PanelSortMode = 'vikunja' | 'dueDate' | 'priority' | 'newest' | 'oldest' | 'alphabetical' | 'overdueFirst';
+export type PanelFilterMode = 'open' | 'dueToday' | 'overdue' | 'dueEmphasis';
+export type PanelDisplayMode = 'full' | 'minimized' | 'edge-docked';
+export type DockEdge = 'left' | 'right' | 'top' | 'bottom';
+export type WindowView = 'manager' | 'panel';
 
-export interface VikunjaConfig {
-  apiBaseUrl: string;
-  apiToken: string;
-  refreshIntervalMinutes: number;
-  showOnlyDue: boolean;
+export interface WindowContext {
+  view: WindowView;
+  panelId?: string;
 }
 
-export interface PanelGeometry {
+export interface VikunjaProject {
+  id: number;
+  title: string;
+  parentProjectId: number | null;
+  isArchived: boolean;
+}
+
+export interface VikunjaTask {
+  id: number;
+  title: string;
+  description: string;
+  done: boolean;
+  dueDate: string | null;
+  priority: number;
+  projectId: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+  position: number | null;
+}
+
+export interface SyncState {
+  status: 'idle' | 'syncing' | 'ready' | 'offline' | 'error';
+  lastSyncAt: string | null;
+  lastError: string | null;
+}
+
+export interface BoundsState {
   x: number;
   y: number;
   width: number;
@@ -15,38 +44,121 @@ export interface PanelGeometry {
   displayId?: number;
 }
 
-export interface StickyVikConfig {
-  vikunja: VikunjaConfig;
-  panel: {
-    side: DockSide;
-    collapsed: boolean;
-    collapsedWidth: number;
-    expandedWidth: number;
-    lastBounds?: PanelGeometry;
-  };
+export interface GlobalDefaults {
+  backgroundColor: string;
+  textColor: string;
+  fontSize: number;
+  opacity: number;
+  itemCount: number;
+  sortMode: PanelSortMode;
+  filterMode: PanelFilterMode;
+  notificationsEnabled: boolean;
+  alwaysOnTop: boolean;
+  displayMode: PanelDisplayMode;
+  dockEdge: DockEdge;
 }
 
-export interface RendererBootstrap {
-  config: StickyVikConfig;
-  panelState: {
-    collapsed: boolean;
-    side: DockSide;
+export interface AppSettings {
+  serverUrl: string;
+  authMethod: AuthMethod;
+  username: string;
+  includeSubprojects: boolean;
+  allowedProjectIds: number[];
+  syncIntervalSeconds: number;
+  launchAtStartup: boolean;
+  pauseAlwaysOnTop: boolean;
+  notifications: {
+    enabled: boolean;
+    overdue: boolean;
+    dueToday: boolean;
   };
+  defaults: GlobalDefaults;
 }
 
-export interface SaveConfigResult {
-  config: StickyVikConfig;
+export interface PanelConfig {
+  id: string;
+  name: string;
+  projectId: number | null;
+  backgroundColor: string;
+  textColor: string;
+  fontSize: number;
+  opacity: number;
+  itemCount: number;
+  sortMode: PanelSortMode;
+  filterMode: PanelFilterMode;
+  alwaysOnTop: boolean;
+  displayMode: PanelDisplayMode;
+  dockEdge: DockEdge;
+  monitorMode: 'primary' | 'selected';
+  displayId?: number;
+  snapToGrid: boolean;
+  gridSize: number;
+  bounds: BoundsState;
+  hoverExpanded: boolean;
+}
+
+export interface ConnectionTestInput {
+  serverUrl: string;
+  authMethod: AuthMethod;
+  username: string;
+  secret: string;
+}
+
+export interface SaveSettingsInput {
+  settings: AppSettings;
+  secret?: string;
+}
+
+export interface CredentialsStatus {
+  hasSecret: boolean;
+}
+
+export interface ManagerBootstrap {
+  window: WindowContext;
+  settings: AppSettings;
+  panels: PanelConfig[];
+  projects: VikunjaProject[];
+  sync: SyncState;
+  credentials: CredentialsStatus;
+}
+
+export interface PanelBootstrap {
+  window: WindowContext;
+  panel: PanelConfig;
+  settings: AppSettings;
+  projects: VikunjaProject[];
+  tasks: VikunjaTask[];
+  sync: SyncState;
+}
+
+export interface TestConnectionResult {
+  ok: boolean;
+  message: string;
+  projects: VikunjaProject[];
 }
 
 export interface StickyVikBridge {
-  getBootstrap: () => Promise<RendererBootstrap>;
-  saveConfig: (config: StickyVikConfig) => Promise<SaveConfigResult>;
-  toggleCollapse: () => Promise<{ collapsed: boolean }>;
-  setHoverState: (hovered: boolean) => Promise<void>;
-  openDevTools: () => Promise<void>;
-  onPanelStateChanged: (
-    listener: (state: RendererBootstrap['panelState']) => void
-  ) => () => void;
+  getWindowContext: () => Promise<WindowContext>;
+  getManagerBootstrap: () => Promise<ManagerBootstrap>;
+  getPanelBootstrap: (panelId: string) => Promise<PanelBootstrap>;
+  saveSettings: (input: SaveSettingsInput) => Promise<ManagerBootstrap>;
+  testConnection: (input: ConnectionTestInput) => Promise<TestConnectionResult>;
+  syncNow: () => Promise<void>;
+  createPanel: () => Promise<PanelConfig>;
+  updatePanel: (panel: PanelConfig) => Promise<PanelConfig>;
+  deletePanel: (panelId: string) => Promise<void>;
+  showManager: () => Promise<void>;
+  showAllPanels: () => Promise<void>;
+  hideAllPanels: () => Promise<void>;
+  togglePauseAlwaysOnTop: () => Promise<void>;
+  setPanelHoverState: (panelId: string, hovered: boolean) => Promise<void>;
+  togglePanelMinimized: (panelId: string) => Promise<PanelConfig>;
+  createTask: (panelId: string, title: string) => Promise<void>;
+  toggleTaskDone: (panelId: string, taskId: number, done: boolean) => Promise<void>;
+  renameTask: (panelId: string, taskId: number, title: string) => Promise<void>;
+  moveTask: (panelId: string, taskId: number, projectId: number) => Promise<void>;
+  getTaskDetails: (taskId: number) => Promise<VikunjaTask>;
+  onStateInvalidated: (listener: () => void) => () => void;
 }
 
 declare global {

@@ -1,0 +1,446 @@
+import { useEffect, useMemo, useState } from 'react';
+
+import type { AppSettings, PanelConfig, VikunjaProject } from '../../shared/types';
+import { useAppStore } from '../store/useAppStore';
+
+function buildProjectLabel(projectId: number, projects: VikunjaProject[]) {
+  const lookup = new Map(projects.map((project) => [project.id, project]));
+  const segments: string[] = [];
+  let current = lookup.get(projectId) ?? null;
+
+  while (current) {
+    segments.unshift(current.title);
+    current = current.parentProjectId ? lookup.get(current.parentProjectId) ?? null : null;
+  }
+
+  return segments.join(' / ');
+}
+
+export function ManagerView() {
+  const manager = useAppStore((state) => state.manager);
+  const testResult = useAppStore((state) => state.testResult);
+  const saveSettings = useAppStore((state) => state.saveSettings);
+  const testConnection = useAppStore((state) => state.testConnection);
+  const createPanel = useAppStore((state) => state.createPanel);
+  const updatePanel = useAppStore((state) => state.updatePanel);
+  const deletePanel = useAppStore((state) => state.deletePanel);
+  const syncNow = useAppStore((state) => state.syncNow);
+  const showAllPanels = useAppStore((state) => state.showAllPanels);
+  const hideAllPanels = useAppStore((state) => state.hideAllPanels);
+  const togglePauseAlwaysOnTop = useAppStore((state) => state.togglePauseAlwaysOnTop);
+
+  const [settingsDraft, setSettingsDraft] = useState<AppSettings | null>(null);
+  const [panelDrafts, setPanelDrafts] = useState<Record<string, PanelConfig>>({});
+  const [secret, setSecret] = useState('');
+
+  useEffect(() => {
+    if (!manager) {
+      return;
+    }
+
+    setSettingsDraft(manager.settings);
+    setPanelDrafts(Object.fromEntries(manager.panels.map((panel) => [panel.id, panel])));
+  }, [manager]);
+
+  const projectLabels = useMemo(() => {
+    if (!manager) {
+      return new Map<number, string>();
+    }
+
+    return new Map(manager.projects.map((project) => [project.id, buildProjectLabel(project.id, manager.projects)]));
+  }, [manager]);
+
+  if (!manager || !settingsDraft) {
+    return null;
+  }
+
+  return (
+    <div className="manager-shell">
+      <header className="manager-hero">
+        <div>
+          <p className="eyebrow">Tray controller</p>
+          <h1>Vikunja Sticky</h1>
+          <p className="muted">A desktop companion for at-a-glance Vikunja projects and quick task actions.</p>
+        </div>
+        <div className="hero-actions">
+          <button type="button" onClick={() => void createPanel()}>
+            New panel
+          </button>
+          <button className="secondary" type="button" onClick={() => void syncNow()}>
+            Sync now
+          </button>
+        </div>
+      </header>
+
+      <section className="manager-grid">
+        <article className="card manager-card">
+          <h2>Connection</h2>
+          <div className="field-grid">
+            <label>
+              <span>Server URL</span>
+              <input
+                type="url"
+                value={settingsDraft.serverUrl}
+                onChange={(event) => setSettingsDraft({ ...settingsDraft, serverUrl: event.target.value })}
+              />
+            </label>
+            <label>
+              <span>Auth method</span>
+              <select
+                value={settingsDraft.authMethod}
+                onChange={(event) =>
+                  setSettingsDraft({
+                    ...settingsDraft,
+                    authMethod: event.target.value as AppSettings['authMethod']
+                  })
+                }
+              >
+                <option value="token">API token</option>
+                <option value="password">Username + password</option>
+              </select>
+            </label>
+            <label>
+              <span>Username</span>
+              <input
+                type="text"
+                value={settingsDraft.username}
+                onChange={(event) => setSettingsDraft({ ...settingsDraft, username: event.target.value })}
+                placeholder={settingsDraft.authMethod === 'token' ? 'Optional label' : 'Vikunja username'}
+              />
+            </label>
+            <label>
+              <span>{settingsDraft.authMethod === 'token' ? 'Token' : 'Password'}</span>
+              <input type="password" value={secret} onChange={(event) => setSecret(event.target.value)} />
+            </label>
+          </div>
+
+          <div className="inline-actions">
+            <button
+              type="button"
+              onClick={() =>
+                void testConnection({
+                  serverUrl: settingsDraft.serverUrl,
+                  authMethod: settingsDraft.authMethod,
+                  username: settingsDraft.username,
+                  secret
+                })
+              }
+            >
+              Test connection
+            </button>
+            <button type="button" className="secondary" onClick={() => void saveSettings(settingsDraft, secret || undefined)}>
+              Save settings
+            </button>
+            <span className={`status-pill status-pill--${manager.sync.status}`}>{manager.sync.status}</span>
+          </div>
+
+          {testResult ? <p className={testResult.ok ? 'status-text status-text--ok' : 'status-text status-text--error'}>{testResult.message}</p> : null}
+          {manager.sync.lastError ? <p className="status-text status-text--error">{manager.sync.lastError}</p> : null}
+        </article>
+
+        <article className="card manager-card">
+          <h2>Allowed projects</h2>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={settingsDraft.includeSubprojects}
+              onChange={(event) => setSettingsDraft({ ...settingsDraft, includeSubprojects: event.target.checked })}
+            />
+            <span>Include subprojects in selectors</span>
+          </label>
+          <div className="project-checklist">
+            {manager.projects.map((project) => {
+              const checked = settingsDraft.allowedProjectIds.includes(project.id);
+              return (
+                <label key={project.id} className="project-checklist__item">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(event) => {
+                      const nextIds = event.target.checked
+                        ? [...settingsDraft.allowedProjectIds, project.id]
+                        : settingsDraft.allowedProjectIds.filter((id) => id !== project.id);
+
+                      setSettingsDraft({ ...settingsDraft, allowedProjectIds: nextIds });
+                    }}
+                  />
+                  <span>{projectLabels.get(project.id) ?? project.title}</span>
+                </label>
+              );
+            })}
+          </div>
+        </article>
+
+        <article className="card manager-card">
+          <h2>Defaults & behavior</h2>
+          <div className="field-grid">
+            <label>
+              <span>Default panel color</span>
+              <input
+                type="color"
+                value={settingsDraft.defaults.backgroundColor}
+                onChange={(event) =>
+                  setSettingsDraft({
+                    ...settingsDraft,
+                    defaults: { ...settingsDraft.defaults, backgroundColor: event.target.value }
+                  })
+                }
+              />
+            </label>
+            <label>
+              <span>Default text color</span>
+              <input
+                type="color"
+                value={settingsDraft.defaults.textColor}
+                onChange={(event) =>
+                  setSettingsDraft({
+                    ...settingsDraft,
+                    defaults: { ...settingsDraft.defaults, textColor: event.target.value }
+                  })
+                }
+              />
+            </label>
+            <label>
+              <span>Font size</span>
+              <input
+                type="number"
+                min={12}
+                max={24}
+                value={settingsDraft.defaults.fontSize}
+                onChange={(event) =>
+                  setSettingsDraft({
+                    ...settingsDraft,
+                    defaults: { ...settingsDraft.defaults, fontSize: Number(event.target.value) || 14 }
+                  })
+                }
+              />
+            </label>
+            <label>
+              <span>Sync interval (seconds)</span>
+              <input
+                type="number"
+                min={30}
+                max={900}
+                value={settingsDraft.syncIntervalSeconds}
+                onChange={(event) => setSettingsDraft({ ...settingsDraft, syncIntervalSeconds: Number(event.target.value) || 60 })}
+              />
+            </label>
+          </div>
+
+          <div className="inline-actions">
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={settingsDraft.launchAtStartup}
+                onChange={(event) => setSettingsDraft({ ...settingsDraft, launchAtStartup: event.target.checked })}
+              />
+              <span>Launch on Windows startup</span>
+            </label>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={settingsDraft.notifications.enabled}
+                onChange={(event) =>
+                  setSettingsDraft({
+                    ...settingsDraft,
+                    notifications: { ...settingsDraft.notifications, enabled: event.target.checked }
+                  })
+                }
+              />
+              <span>Enable notification scaffold</span>
+            </label>
+          </div>
+
+          <div className="inline-actions">
+            <button className="secondary" type="button" onClick={() => void showAllPanels()}>
+              Show panels
+            </button>
+            <button className="secondary" type="button" onClick={() => void hideAllPanels()}>
+              Hide panels
+            </button>
+            <button className="secondary" type="button" onClick={() => void togglePauseAlwaysOnTop()}>
+              {settingsDraft.pauseAlwaysOnTop ? 'Resume always-on-top' : 'Pause always-on-top'}
+            </button>
+          </div>
+        </article>
+      </section>
+
+      <section className="card manager-card">
+        <div className="section-header">
+          <div>
+            <h2>Panels</h2>
+            <p className="muted">Each sticky panel can target its own project and visual style.</p>
+          </div>
+          <button type="button" onClick={() => void createPanel()}>
+            Create panel
+          </button>
+        </div>
+
+        <div className="panel-admin-list">
+          {manager.panels.map((panel) => {
+            const draft = panelDrafts[panel.id] ?? panel;
+            return (
+              <article key={panel.id} className="panel-admin-card">
+                <div className="field-grid field-grid--compact">
+                  <label>
+                    <span>Name</span>
+                    <input
+                      type="text"
+                      value={draft.name}
+                      onChange={(event) =>
+                        setPanelDrafts((current) => ({
+                          ...current,
+                          [panel.id]: { ...draft, name: event.target.value }
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    <span>Project</span>
+                    <select
+                      value={draft.projectId ?? ''}
+                      onChange={(event) =>
+                        setPanelDrafts((current) => ({
+                          ...current,
+                          [panel.id]: { ...draft, projectId: event.target.value ? Number(event.target.value) : null }
+                        }))
+                      }
+                    >
+                      <option value="">Choose project</option>
+                      {manager.projects.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {projectLabels.get(project.id) ?? project.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Sort</span>
+                    <select
+                      value={draft.sortMode}
+                      onChange={(event) =>
+                        setPanelDrafts((current) => ({
+                          ...current,
+                          [panel.id]: { ...draft, sortMode: event.target.value as PanelConfig['sortMode'] }
+                        }))
+                      }
+                    >
+                      <option value="vikunja">Vikunja order</option>
+                      <option value="dueDate">Due date</option>
+                      <option value="priority">Priority</option>
+                      <option value="newest">Newest first</option>
+                      <option value="oldest">Oldest first</option>
+                      <option value="alphabetical">Alphabetical</option>
+                      <option value="overdueFirst">Overdue first</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Filter</span>
+                    <select
+                      value={draft.filterMode}
+                      onChange={(event) =>
+                        setPanelDrafts((current) => ({
+                          ...current,
+                          [panel.id]: { ...draft, filterMode: event.target.value as PanelConfig['filterMode'] }
+                        }))
+                      }
+                    >
+                      <option value="open">Open tasks only</option>
+                      <option value="dueToday">Due today</option>
+                      <option value="overdue">Overdue</option>
+                      <option value="dueEmphasis">Open with due emphasis</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Display mode</span>
+                    <select
+                      value={draft.displayMode}
+                      onChange={(event) =>
+                        setPanelDrafts((current) => ({
+                          ...current,
+                          [panel.id]: { ...draft, displayMode: event.target.value as PanelConfig['displayMode'] }
+                        }))
+                      }
+                    >
+                      <option value="full">Full</option>
+                      <option value="minimized">Minimized</option>
+                      <option value="edge-docked">Edge-docked</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Dock edge</span>
+                    <select
+                      value={draft.dockEdge}
+                      onChange={(event) =>
+                        setPanelDrafts((current) => ({
+                          ...current,
+                          [panel.id]: { ...draft, dockEdge: event.target.value as PanelConfig['dockEdge'] }
+                        }))
+                      }
+                    >
+                      <option value="left">Left</option>
+                      <option value="right">Right</option>
+                      <option value="top">Top</option>
+                      <option value="bottom">Bottom</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Color</span>
+                    <input
+                      type="color"
+                      value={draft.backgroundColor}
+                      onChange={(event) =>
+                        setPanelDrafts((current) => ({
+                          ...current,
+                          [panel.id]: { ...draft, backgroundColor: event.target.value }
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    <span>Opacity</span>
+                    <input
+                      type="number"
+                      min={0.45}
+                      max={1}
+                      step={0.05}
+                      value={draft.opacity}
+                      onChange={(event) =>
+                        setPanelDrafts((current) => ({
+                          ...current,
+                          [panel.id]: { ...draft, opacity: Number(event.target.value) || 0.97 }
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+
+                <div className="inline-actions">
+                  <label className="toggle-row">
+                    <input
+                      type="checkbox"
+                      checked={draft.alwaysOnTop}
+                      onChange={(event) =>
+                        setPanelDrafts((current) => ({
+                          ...current,
+                          [panel.id]: { ...draft, alwaysOnTop: event.target.checked }
+                        }))
+                      }
+                    />
+                    <span>Always on top</span>
+                  </label>
+                  <button className="secondary" type="button" onClick={() => void updatePanel(draft)}>
+                    Save panel
+                  </button>
+                  <button className="ghost-button" type="button" onClick={() => void deletePanel(panel.id)}>
+                    Delete
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}

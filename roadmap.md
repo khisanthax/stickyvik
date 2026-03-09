@@ -72,14 +72,13 @@ Windows-first Electron desktop companion for Vikunja with a tray controller, a m
 - Launch on Windows startup: `Done`
 - Restore bounds across app restart: `Done`
 - Monitor-aware restoration and missing-monitor recovery: `Partial`
-- Dock/focus/hover stability polish: `Missing`
+- Dock/focus/hover stability polish: `Partial`
 
 ## Remaining high-priority work
 
-1. Stabilize edge-docked hover-expand timing, focus handling, and edge anchoring.
-2. Respect global and per-panel notification rules cleanly.
-3. Tighten restore behavior and monitor fallback logic.
-4. Make the Vikunja smoke-test path more explicit and verifiable.
+1. Respect global and per-panel notification rules cleanly.
+2. Tighten restore behavior and monitor fallback logic.
+3. Make the Vikunja smoke-test path more explicit and verifiable.
 
 ## Post-MVP / deferred
 

@@ -13,6 +13,7 @@ Implemented in the current branch:
 - Secure credential storage via `keytar`
 - Multiple floating sticky panels with per-panel project selection, style overrides, minimized mode, and edge-docked hover-expand scaffolding
 - Native lightweight task details windows for title, project move, notes, and completion actions
+- Runtime-stabilized dock hover handling and monitor-change window reconciliation
 - Vikunja API client layer for test connection, project fetch, task fetch, create task, complete task, rename task, move task, and details fetch
 - Restore of saved panels and their monitor/bounds data on startup
 - Basic due-today and overdue desktop notifications
@@ -41,7 +42,7 @@ Implemented in the current branch:
 ## Known limitations
 
 - The Vikunja API layer is implemented against the common `/api/v1` endpoints and may need endpoint adjustments for older server versions
-- Edge-docked hover-expand is implemented as the window-management path, but still needs additional polish to reduce edge-case flicker
+- Edge-docked hover-expand is improved, but still needs more product-level polish for every focus/monitor edge case
 - Notification rules currently cover basic due-today and overdue desktop notifications only
 
 ## TODO after MVP

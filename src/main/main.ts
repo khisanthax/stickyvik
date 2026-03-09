@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, Notification } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, Notification, screen } from 'electron';
 
 import type {
   AppSettings,
@@ -46,11 +46,18 @@ import {
   testConnection
 } from './services/vikunja-client';
 
+interface PanelRuntimeState {
+  hovered: boolean;
+  focused: boolean;
+  expanded: boolean;
+  timer?: NodeJS.Timeout;
+}
+
 let managerWindow: BrowserWindow | null = null;
 const panelWindows = new Map<string, BrowserWindow>();
 const detailsWindows = new Map<string, BrowserWindow>();
+const panelRuntime = new Map<string, PanelRuntimeState>();
 const windowContexts = new Map<number, WindowContext>();
-const hoverTimers = new Map<string, NodeJS.Timeout>();
 const notificationMemory = new Set<string>();
 let tray = makeTray();
 let isQuitting = false;
@@ -69,6 +76,52 @@ function getVisibleProjects() {
 
 function getDetailWindowKey(panelId: string, taskId: number) {
   return `${panelId}:${taskId}`;
+}
+
+function getPanelRuntime(panelId: string): PanelRuntimeState {
+  const existing = panelRuntime.get(panelId);
+  if (existing) {
+    return existing;
+  }
+
+  const created: PanelRuntimeState = {
+    hovered: false,
+    focused: false,
+    expanded: false
+  };
+  panelRuntime.set(panelId, created);
+  return created;
+}
+
+function getEffectivePanel(panel: PanelConfig): PanelConfig {
+  const runtime = getPanelRuntime(panel.id);
+  return {
+    ...panel,
+    hoverExpanded: panel.displayMode === 'edge-docked' ? runtime.expanded : false
+  };
+}
+
+function syncSinglePanelWindow(panelId: string) {
+  const panel = getPanels().find((entry) => entry.id === panelId);
+  const window = panelWindows.get(panelId);
+  if (!panel || !window || window.isDestroyed()) {
+    return;
+  }
+
+  applyPanelWindowState(window, getEffectivePanel(panel), getSettings().pauseAlwaysOnTop);
+}
+
+function schedulePanelExpandedState(panelId: string, expanded: boolean, delayMs: number) {
+  const runtime = getPanelRuntime(panelId);
+  if (runtime.timer) {
+    clearTimeout(runtime.timer);
+  }
+
+  runtime.timer = setTimeout(() => {
+    runtime.expanded = expanded;
+    runtime.timer = undefined;
+    syncSinglePanelWindow(panelId);
+  }, delayMs);
 }
 
 async function buildManagerBootstrap(): Promise<ManagerBootstrap> {
@@ -93,7 +146,7 @@ async function buildPanelBootstrap(panelId: string): Promise<PanelBootstrap> {
 
   return {
     window: { view: 'panel', panelId },
-    panel,
+    panel: getEffectivePanel(panel),
     settings: getSettings(),
     projects: getVisibleProjects(),
     tasks: getTaskCache(panelId),
@@ -120,7 +173,7 @@ async function buildDetailsBootstrap(panelId: string, taskId: number): Promise<D
 
   return {
     window: { view: 'details', panelId, taskId },
-    panel,
+    panel: getEffectivePanel(panel),
     task,
     projects: getVisibleProjects(),
     sync: getSyncState()
@@ -280,19 +333,44 @@ function persistPanel(panel: PanelConfig) {
   setPanels(nextPanels);
 }
 
+function handlePanelFocusChange(panelId: string, focused: boolean) {
+  const panel = getPanels().find((entry) => entry.id === panelId);
+  if (!panel || panel.displayMode !== 'edge-docked') {
+    return;
+  }
+
+  const runtime = getPanelRuntime(panelId);
+  runtime.focused = focused;
+  if (focused) {
+    schedulePanelExpandedState(panelId, true, 0);
+    return;
+  }
+
+  if (!runtime.hovered) {
+    schedulePanelExpandedState(panelId, false, 500);
+  }
+}
+
 async function createOrShowPanelWindow(panel: PanelConfig) {
   const existing = panelWindows.get(panel.id);
   if (existing && !existing.isDestroyed()) {
-    applyPanelWindowState(existing, panel, getSettings().pauseAlwaysOnTop);
+    applyPanelWindowState(existing, getEffectivePanel(panel), getSettings().pauseAlwaysOnTop);
     existing.show();
     return existing;
   }
 
-  const window = createPanelWindow(panel, getSettings().pauseAlwaysOnTop);
+  const window = createPanelWindow(getEffectivePanel(panel), getSettings().pauseAlwaysOnTop);
   panelWindows.set(panel.id, window);
+  panelRuntime.set(panel.id, {
+    hovered: false,
+    focused: false,
+    expanded: false
+  });
   windowContexts.set(window.webContents.id, { view: 'panel', panelId: panel.id });
 
   window.on('ready-to-show', () => window.show());
+  window.on('focus', () => handlePanelFocusChange(panel.id, true));
+  window.on('blur', () => handlePanelFocusChange(panel.id, false));
   window.on('move', () => {
     const nextPanel = getPanels().find((entry) => entry.id === panel.id);
     if (!nextPanel) {
@@ -301,7 +379,7 @@ async function createOrShowPanelWindow(panel: PanelConfig) {
 
     persistPanel({
       ...nextPanel,
-      bounds: capturePanelBounds(window, nextPanel)
+      bounds: capturePanelBounds(window, getEffectivePanel(nextPanel))
     });
   });
   window.on('resize', () => {
@@ -312,11 +390,12 @@ async function createOrShowPanelWindow(panel: PanelConfig) {
 
     persistPanel({
       ...nextPanel,
-      bounds: capturePanelBounds(window, nextPanel)
+      bounds: capturePanelBounds(window, getEffectivePanel(nextPanel))
     });
   });
   window.on('closed', () => {
     panelWindows.delete(panel.id);
+    panelRuntime.delete(panel.id);
     windowContexts.delete(window.webContents.id);
     if (!isQuitting && !suppressPanelDeletion) {
       setPanels(getPanels().filter((entry) => entry.id !== panel.id));
@@ -402,7 +481,7 @@ async function togglePauseAlwaysOnTop() {
   for (const panel of getPanels()) {
     const window = panelWindows.get(panel.id);
     if (window) {
-      applyPanelWindowState(window, panel, nextSettings.pauseAlwaysOnTop);
+      applyPanelWindowState(window, getEffectivePanel(panel), nextSettings.pauseAlwaysOnTop);
     }
   }
   invalidateState();
@@ -443,9 +522,14 @@ async function saveSettingsAndSync(payload: { settings: AppSettings; secret?: st
 }
 
 async function updatePanel(panel: PanelConfig) {
-  persistPanel(panel);
+  persistPanel({
+    ...panel,
+    hoverExpanded: false
+  });
+  const runtime = getPanelRuntime(panel.id);
+  runtime.expanded = false;
   const window = await createOrShowPanelWindow(panel);
-  applyPanelWindowState(window, panel, getSettings().pauseAlwaysOnTop);
+  applyPanelWindowState(window, getEffectivePanel(panel), getSettings().pauseAlwaysOnTop);
   if (panel.projectId) {
     try {
       const tasks = await fetchTasksForPanel(getSettings(), panel);
@@ -492,30 +576,35 @@ async function handlePanelHover(panelId: string, hovered: boolean) {
     return;
   }
 
-  const existing = hoverTimers.get(panelId);
-  if (existing) {
-    clearTimeout(existing);
+  const runtime = getPanelRuntime(panelId);
+  runtime.hovered = hovered;
+  if (hovered) {
+    schedulePanelExpandedState(panelId, true, 120);
+    return;
   }
 
-  const timer = setTimeout(() => {
-    const current = getPanels().find((entry) => entry.id === panelId);
-    if (!current) {
-      return;
+  if (!runtime.focused) {
+    schedulePanelExpandedState(panelId, false, 650);
+  }
+}
+
+function reconcilePanelWindows() {
+  for (const panel of getPanels()) {
+    const window = panelWindows.get(panel.id);
+    if (!window || window.isDestroyed()) {
+      continue;
     }
 
-    const next: PanelConfig = {
-      ...current,
-      hoverExpanded: hovered
-    };
-    persistPanel(next);
-    const window = panelWindows.get(panelId);
-    if (window) {
-      applyPanelWindowState(window, next, getSettings().pauseAlwaysOnTop);
-    }
-    invalidateState();
-  }, hovered ? 140 : 650);
+    const effective = getEffectivePanel(panel);
+    applyPanelWindowState(window, effective, getSettings().pauseAlwaysOnTop);
+    persistPanel({
+      ...panel,
+      bounds: capturePanelBounds(window, effective),
+      hoverExpanded: false
+    });
+  }
 
-  hoverTimers.set(panelId, timer);
+  invalidateState();
 }
 
 async function bootstrap() {
@@ -524,6 +613,10 @@ async function bootstrap() {
   scheduleSync();
   tray.on('double-click', () => void ensureManagerWindow());
   updateTrayMenu();
+
+  screen.on('display-added', () => reconcilePanelWindows());
+  screen.on('display-removed', () => reconcilePanelWindows());
+  screen.on('display-metrics-changed', () => reconcilePanelWindows());
 
   const storedSecret = await loadStoredSecret();
   if (!storedSecret || getPanels().length === 0) {
@@ -606,7 +699,8 @@ async function bootstrap() {
 
     const next: PanelConfig = {
       ...panel,
-      displayMode: panel.displayMode === 'minimized' ? 'full' : 'minimized'
+      displayMode: panel.displayMode === 'minimized' ? 'full' : 'minimized',
+      hoverExpanded: false
     };
     await updatePanel(next);
     return next;

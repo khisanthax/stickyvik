@@ -15,8 +15,9 @@ function clamp(value: number, min: number, max: number) {
 
 function getNearestDisplay(panel: PanelConfig) {
   const displays = screen.getAllDisplays();
-  if (panel.monitorMode === 'selected' && panel.displayId) {
-    const selected = displays.find((display) => display.id === panel.displayId);
+  const preferredDisplayId = panel.displayId ?? panel.bounds.displayId;
+  if (panel.monitorMode === 'selected' && preferredDisplayId) {
+    const selected = displays.find((display) => display.id === preferredDisplayId);
     if (selected) {
       return selected;
     }
@@ -250,3 +251,4 @@ export function makeTray() {
   tray.setToolTip('Vikunja Sticky');
   return tray;
 }
+

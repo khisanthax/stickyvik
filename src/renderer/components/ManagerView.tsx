@@ -216,6 +216,24 @@ export function ManagerView() {
               />
             </label>
             <label>
+              <span>Default panel notifications</span>
+              <select
+                value={settingsDraft.defaults.notificationMode}
+                onChange={(event) =>
+                  setSettingsDraft({
+                    ...settingsDraft,
+                    defaults: { ...settingsDraft.defaults, notificationMode: event.target.value as PanelConfig['notificationMode'] }
+                  })
+                }
+              >
+                <option value="default">Use global defaults</option>
+                <option value="off">Off</option>
+                <option value="dueToday">Due today</option>
+                <option value="overdue">Overdue</option>
+                <option value="dueTodayAndOverdue">Due today + overdue</option>
+              </select>
+            </label>
+            <label>
               <span>Sync interval (seconds)</span>
               <input
                 type="number"
@@ -534,3 +552,4 @@ export function ManagerView() {
     </div>
   );
 }
+

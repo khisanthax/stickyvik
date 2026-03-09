@@ -11,9 +11,9 @@ Implemented in the current branch:
 - Tray controller with create panel, show/hide, sync, settings, pause always-on-top, and quit actions
 - Manager window with connection settings, allowed project selection, defaults, and persisted panel management
 - Secure credential storage via `keytar`
-- Multiple floating sticky panels with per-panel project selection, style overrides, minimized mode, and edge-docked hover-expand scaffolding
+- Multiple floating sticky panels with per-panel project selection, style overrides, minimized mode, and edge-docked hover-expand behavior
 - Native lightweight task details windows for title, project move, notes, and completion actions
-- Runtime-stabilized dock hover handling and monitor-change window reconciliation
+- Runtime-stabilized dock hover handling, monitor-change reconciliation, and monitor-aware restore fallback
 - Vikunja API client layer for test connection, project fetch, task fetch, create task, complete task, rename task, move task, and details fetch
 - Restore of saved panels and their monitor/bounds data on startup
 - Global notification defaults plus per-panel notification overrides for due-today and overdue reminders
@@ -48,16 +48,15 @@ Implemented in the current branch:
 5. Click `Test connection` and confirm the project count returns successfully
 6. Save settings, choose allowed projects, and create a panel
 7. Verify the panel loads tasks for the selected project
-8. Verify quick add, complete, rename, move, and native details window behavior
+8. Verify quick add, complete, rename, move, notification mode selection, and native details window behavior
 9. Switch a panel to `edge-docked` and confirm expand/collapse behavior on hover and focus
 10. Restart the app and confirm panels restore to the expected monitor and bounds
 
 ## Known limitations
 
 - The Vikunja API layer is implemented against the common `/api/v1` endpoints and may need endpoint adjustments for older server versions
-- Edge-docked hover-expand is improved, but still needs more product-level polish for every focus/monitor edge case
-- Monitor fallback and restoration are better, but still not fully battle-tested across more complex monitor changes
 - A real live Vikunja smoke test still depends on developer-provided credentials and a reachable server
+- The current first-run experience is functional through the manager window, but not yet a dedicated onboarding flow
 
 ## TODO after MVP
 

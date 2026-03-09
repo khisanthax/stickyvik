@@ -47,8 +47,8 @@ Windows-first Electron desktop companion for Vikunja with a tray controller, a m
 - Per-panel project, colors, font size, opacity, item limit: `Done`
 - Always-on-top control: `Done`
 - Minimized title-only mode: `Done`
-- Edge-docked collapsed hover-expand mode: `Partial`
-- Selected monitor placement and fallback restore: `Partial`
+- Edge-docked collapsed hover-expand mode: `Done`
+- Selected monitor placement and fallback restore: `Done`
 - Snap-to-grid settings scaffolding: `Partial`
 
 ### Phase 5: Task interactions
@@ -71,14 +71,13 @@ Windows-first Electron desktop companion for Vikunja with a tray controller, a m
 
 - Launch on Windows startup: `Done`
 - Restore bounds across app restart: `Done`
-- Monitor-aware restoration and missing-monitor recovery: `Partial`
-- Dock/focus/hover stability polish: `Partial`
+- Monitor-aware restoration and missing-monitor recovery: `Done`
+- Dock/focus/hover stability polish: `Done`
 
 ## Remaining high-priority work
 
-1. Tighten restore behavior and monitor fallback logic.
-2. Make the Vikunja smoke-test path more explicit and verifiable in normal development.
-3. Finish the remaining product-level polish on edge-docked hover behavior.
+1. Run a live smoke test against a real Vikunja instance with valid credentials.
+2. Add dedicated first-run onboarding polish instead of relying on the manager window only.
 
 ## Post-MVP / deferred
 

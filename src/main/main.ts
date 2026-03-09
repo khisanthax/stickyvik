@@ -101,6 +101,14 @@ function getEffectivePanel(panel: PanelConfig): PanelConfig {
   };
 }
 
+function clearPanelRuntimeTimer(panelId: string) {
+  const runtime = getPanelRuntime(panelId);
+  if (runtime.timer) {
+    clearTimeout(runtime.timer);
+    runtime.timer = undefined;
+  }
+}
+
 function syncSinglePanelWindow(panelId: string) {
   const panel = getPanels().find((entry) => entry.id === panelId);
   const window = panelWindows.get(panelId);
@@ -113,11 +121,18 @@ function syncSinglePanelWindow(panelId: string) {
 
 function schedulePanelExpandedState(panelId: string, expanded: boolean, delayMs: number) {
   const runtime = getPanelRuntime(panelId);
-  if (runtime.timer) {
-    clearTimeout(runtime.timer);
+  clearPanelRuntimeTimer(panelId);
+
+  if (runtime.expanded === expanded) {
+    return;
   }
 
   runtime.timer = setTimeout(() => {
+    if (runtime.expanded === expanded) {
+      runtime.timer = undefined;
+      return;
+    }
+
     runtime.expanded = expanded;
     runtime.timer = undefined;
     syncSinglePanelWindow(panelId);
@@ -373,7 +388,7 @@ function handlePanelFocusChange(panelId: string, focused: boolean) {
   }
 
   if (!runtime.hovered) {
-    schedulePanelExpandedState(panelId, false, 500);
+    schedulePanelExpandedState(panelId, false, 420);
   }
 }
 
@@ -395,6 +410,21 @@ async function createOrShowPanelWindow(panel: PanelConfig) {
   windowContexts.set(window.webContents.id, { view: 'panel', panelId: panel.id });
 
   window.on('ready-to-show', () => window.show());
+  window.on('show', () => {
+    const runtime = getPanelRuntime(panel.id);
+    runtime.focused = false;
+    runtime.hovered = false;
+    runtime.expanded = false;
+    clearPanelRuntimeTimer(panel.id);
+    syncSinglePanelWindow(panel.id);
+  });
+  window.on('hide', () => {
+    const runtime = getPanelRuntime(panel.id);
+    runtime.focused = false;
+    runtime.hovered = false;
+    runtime.expanded = false;
+    clearPanelRuntimeTimer(panel.id);
+  });
   window.on('focus', () => handlePanelFocusChange(panel.id, true));
   window.on('blur', () => handlePanelFocusChange(panel.id, false));
   window.on('move', () => {
@@ -403,9 +433,11 @@ async function createOrShowPanelWindow(panel: PanelConfig) {
       return;
     }
 
+    const nextBounds = capturePanelBounds(window, getEffectivePanel(nextPanel));
     persistPanel({
       ...nextPanel,
-      bounds: capturePanelBounds(window, getEffectivePanel(nextPanel))
+      displayId: nextBounds.displayId,
+      bounds: nextBounds
     });
   });
   window.on('resize', () => {
@@ -414,13 +446,16 @@ async function createOrShowPanelWindow(panel: PanelConfig) {
       return;
     }
 
+    const nextBounds = capturePanelBounds(window, getEffectivePanel(nextPanel));
     persistPanel({
       ...nextPanel,
-      bounds: capturePanelBounds(window, getEffectivePanel(nextPanel))
+      displayId: nextBounds.displayId,
+      bounds: nextBounds
     });
   });
   window.on('closed', () => {
     panelWindows.delete(panel.id);
+    clearPanelRuntimeTimer(panel.id);
     panelRuntime.delete(panel.id);
     windowContexts.delete(window.webContents.id);
     if (!isQuitting && !suppressPanelDeletion) {
@@ -468,7 +503,12 @@ function showAllPanels() {
 }
 
 function hideAllPanels() {
-  for (const window of panelWindows.values()) {
+  for (const [panelId, window] of panelWindows.entries()) {
+    const runtime = getPanelRuntime(panelId);
+    runtime.focused = false;
+    runtime.hovered = false;
+    runtime.expanded = false;
+    clearPanelRuntimeTimer(panelId);
     window.hide();
   }
 }
@@ -603,14 +643,18 @@ async function handlePanelHover(panelId: string, hovered: boolean) {
   }
 
   const runtime = getPanelRuntime(panelId);
+  if (runtime.hovered === hovered) {
+    return;
+  }
+
   runtime.hovered = hovered;
   if (hovered) {
-    schedulePanelExpandedState(panelId, true, 120);
+    schedulePanelExpandedState(panelId, true, 100);
     return;
   }
 
   if (!runtime.focused) {
-    schedulePanelExpandedState(panelId, false, 650);
+    schedulePanelExpandedState(panelId, false, 560);
   }
 }
 
@@ -621,11 +665,16 @@ function reconcilePanelWindows() {
       continue;
     }
 
+    const runtime = getPanelRuntime(panel.id);
+    runtime.expanded = false;
+    clearPanelRuntimeTimer(panel.id);
     const effective = getEffectivePanel(panel);
     applyPanelWindowState(window, effective, getSettings().pauseAlwaysOnTop);
+    const nextBounds = capturePanelBounds(window, effective);
     persistPanel({
       ...panel,
-      bounds: capturePanelBounds(window, effective),
+      displayId: nextBounds.displayId,
+      bounds: nextBounds,
       hoverExpanded: false
     });
   }
@@ -788,4 +837,7 @@ app.on('before-quit', () => {
 app.on('window-all-closed', () => {
   // The tray app stays resident even when all windows are closed.
 });
+
+
+
 

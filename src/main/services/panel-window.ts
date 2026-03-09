@@ -122,7 +122,7 @@ export function createManagerWindow() {
     backgroundColor: '#13161b',
     autoHideMenuBar: true,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, '..', 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -143,7 +143,7 @@ export function createPanelWindow(panel: PanelConfig, pauseAlwaysOnTop: boolean)
     transparent: false,
     backgroundColor: '#101217',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, '..', 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -165,7 +165,7 @@ export function createDetailsWindow(parent?: BrowserWindow) {
     title: 'Task Details',
     parent,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, '..', 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false
     }

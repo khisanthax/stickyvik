@@ -14,6 +14,15 @@ interface RequestOptions extends RequestInit {
   authMethod?: AuthMethod;
 }
 
+interface AuthTokenCacheEntry {
+  key: string;
+  token: string;
+  createdAt: number;
+}
+
+const AUTH_TOKEN_TTL_MS = 10 * 60 * 1000;
+let authTokenCache: AuthTokenCacheEntry | null = null;
+
 function normalizeServerUrl(serverUrl: string) {
   return serverUrl.trim().replace(/\/+$/, '');
 }
@@ -49,6 +58,14 @@ function mapTask(task: Record<string, unknown>): VikunjaTask {
   };
 }
 
+function clearAuthTokenCache() {
+  authTokenCache = null;
+}
+
+function getPasswordCacheKey(settings: AppSettings, username: string, secret: string) {
+  return `${normalizeServerUrl(settings.serverUrl)}|password|${username}|${secret}`;
+}
+
 async function getAuthToken(settings: AppSettings, authMethod?: AuthMethod) {
   const stored = await loadStoredSecret();
   if (!stored || !stored.secret) {
@@ -58,6 +75,11 @@ async function getAuthToken(settings: AppSettings, authMethod?: AuthMethod) {
   const effectiveMethod = authMethod ?? settings.authMethod;
   if (effectiveMethod === 'token') {
     return stored.secret;
+  }
+
+  const cacheKey = getPasswordCacheKey(settings, stored.username, stored.secret);
+  if (authTokenCache && authTokenCache.key === cacheKey && Date.now() - authTokenCache.createdAt < AUTH_TOKEN_TTL_MS) {
+    return authTokenCache.token;
   }
 
   const response = await fetch(`${getApiBase(settings.serverUrl)}/login`, {
@@ -81,11 +103,18 @@ async function getAuthToken(settings: AppSettings, authMethod?: AuthMethod) {
     throw new Error('Vikunja login did not return a token');
   }
 
+  authTokenCache = {
+    key: cacheKey,
+    token: payload.token,
+    createdAt: Date.now()
+  };
+
   return payload.token;
 }
 
-async function request<T>(settings: AppSettings, path: string, init?: RequestOptions) {
-  const token = await getAuthToken(settings, init?.authMethod);
+async function request<T>(settings: AppSettings, path: string, init?: RequestOptions, allowRetry = true) {
+  const effectiveMethod = init?.authMethod ?? settings.authMethod;
+  const token = await getAuthToken(settings, effectiveMethod);
   const response = await fetch(`${getApiBase(settings.serverUrl)}${path}`, {
     ...init,
     headers: {
@@ -97,6 +126,11 @@ async function request<T>(settings: AppSettings, path: string, init?: RequestOpt
   });
 
   if (!response.ok) {
+    if (response.status === 401 && effectiveMethod === 'password' && allowRetry) {
+      clearAuthTokenCache();
+      return request<T>(settings, path, init, false);
+    }
+
     const text = await response.text();
     throw new Error(text || `Vikunja request failed with status ${response.status}`);
   }
@@ -106,6 +140,23 @@ async function request<T>(settings: AppSettings, path: string, init?: RequestOpt
   }
 
   return (await response.json()) as T;
+}
+
+async function resolveConnectionSecret(input: ConnectionTestInput) {
+  if (input.secret?.trim()) {
+    return input.secret.trim();
+  }
+
+  const stored = await loadStoredSecret();
+  if (!stored || !stored.secret) {
+    throw new Error('No stored credentials found. Enter your credential to test the connection.');
+  }
+
+  if (stored.authMethod !== input.authMethod || stored.username !== input.username) {
+    throw new Error('Stored credential does not match the current connection settings. Re-enter it and test again.');
+  }
+
+  return stored.secret;
 }
 
 export async function testConnection(input: ConnectionTestInput) {
@@ -139,9 +190,11 @@ export async function testConnection(input: ConnectionTestInput) {
     }
   };
 
+  const secret = await resolveConnectionSecret(input);
+
   const token =
     input.authMethod === 'token'
-      ? input.secret
+      ? secret
       : await (async () => {
           const response = await fetch(`${getApiBase(input.serverUrl)}/login`, {
             method: 'POST',
@@ -151,7 +204,7 @@ export async function testConnection(input: ConnectionTestInput) {
             },
             body: JSON.stringify({
               username: input.username,
-              password: input.secret
+              password: secret
             })
           });
 

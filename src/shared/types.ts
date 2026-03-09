@@ -105,7 +105,7 @@ export interface ConnectionTestInput {
   serverUrl: string;
   authMethod: AuthMethod;
   username: string;
-  secret: string;
+  secret?: string;
 }
 
 export interface SaveSettingsInput {

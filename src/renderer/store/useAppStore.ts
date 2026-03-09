@@ -87,12 +87,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ context, details, manager: null, panel: null });
   },
   saveSettings: async (settings, secret) => {
-    set({ loading: true, error: null });
+    set({ error: null });
     try {
       const manager = await window.stickyVik.saveSettings({ settings, secret });
-      set({ manager, loading: false });
+      set({ manager });
     } catch (error) {
-      set({ loading: false, error: error instanceof Error ? error.message : 'Failed to save settings' });
+      set({ error: error instanceof Error ? error.message : 'Failed to save settings' });
     }
   },
   testConnection: async (input) => {

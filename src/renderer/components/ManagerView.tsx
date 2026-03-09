@@ -110,7 +110,12 @@ export function ManagerView() {
             </label>
             <label>
               <span>{settingsDraft.authMethod === 'token' ? 'Token' : 'Password'}</span>
-              <input type="password" value={secret} onChange={(event) => setSecret(event.target.value)} />
+              <input
+                type="password"
+                value={secret}
+                placeholder={manager.credentials.hasSecret ? 'Stored credential will be reused unless replaced' : ''}
+                onChange={(event) => setSecret(event.target.value)}
+              />
             </label>
           </div>
 
@@ -122,7 +127,7 @@ export function ManagerView() {
                   serverUrl: settingsDraft.serverUrl,
                   authMethod: settingsDraft.authMethod,
                   username: settingsDraft.username,
-                  secret
+                  secret: secret || undefined
                 })
               }
             >
@@ -134,6 +139,9 @@ export function ManagerView() {
             <span className={`status-pill status-pill--${manager.sync.status}`}>{manager.sync.status}</span>
           </div>
 
+          {manager.credentials.hasSecret && !secret ? (
+            <p className="muted">Stored credential is available and will be reused unless you enter a new one.</p>
+          ) : null}
           {testResult ? <p className={testResult.ok ? 'status-text status-text--ok' : 'status-text status-text--error'}>{testResult.message}</p> : null}
           {manager.sync.lastError ? <p className="status-text status-text--error">{manager.sync.lastError}</p> : null}
         </article>

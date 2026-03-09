@@ -64,6 +64,7 @@ Windows-first Electron desktop companion for Vikunja with a tray controller, a m
 
 - Auto-sync and manual refresh: `Done`
 - Offline/auth error state with cached data: `Done`
+- Password-auth credential reuse and session token caching: `Done`
 - Global notification settings: `Done`
 - Per-panel notification override: `Done`
 

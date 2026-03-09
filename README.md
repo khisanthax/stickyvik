@@ -37,6 +37,8 @@ Implemented in the current branch:
 - Vikunja server URL and non-secret app settings are stored locally in the app store
 - Credentials or tokens are stored with `keytar`
 - One Vikunja account/server is supported for MVP
+- Saved credentials are reused for later syncs and connection tests unless you enter a replacement in settings
+- The password auth flow caches its Vikunja session token in-process to avoid unnecessary repeat logins during sync
 - The app targets Windows behavior first, including tray persistence and `openAtLogin`
 
 ## Smoke test checklist

@@ -1,0 +1,163 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", "Arial Nova", sans-serif;
+  background:
+    radial-gradient(circle at top, rgba(255, 172, 74, 0.16), transparent 38%),
+    linear-gradient(180deg, #14181f 0%, #0d1015 100%);
+  color: #f4f7fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.shell {
+  min-height: 100vh;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: padding 150ms ease;
+}
+
+.shell--collapsed {
+  padding: 10px;
+}
+
+.hero,
+.card {
+  background: rgba(10, 13, 18, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 18px;
+}
+
+.hero h1,
+.panel h2,
+.panel p {
+  margin: 0;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: #f8c37b;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card {
+  padding: 16px;
+}
+
+.panel h2 {
+  margin-bottom: 14px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #d7dde6;
+}
+
+input {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  padding: 10px 12px;
+}
+
+.toggle {
+  flex-direction: row;
+  align-items: center;
+}
+
+.toggle input {
+  width: auto;
+}
+
+.inline-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+button {
+  border: none;
+  border-radius: 12px;
+  background: #ffb354;
+  color: #1a1308;
+  padding: 10px 14px;
+  font-weight: 700;
+}
+
+button.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f5f7fa;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.segmented button {
+  background: rgba(255, 255, 255, 0.08);
+  color: #dbe2eb;
+}
+
+.segmented button.active {
+  background: #f8c37b;
+  color: #1e1508;
+}
+
+.collapsed-rail {
+  min-height: calc(100vh - 92px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: rgba(11, 14, 20, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}

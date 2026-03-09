@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { AppSettings, PanelConfig, VikunjaProject } from '../../shared/types';
 import { useAppStore } from '../store/useAppStore';
+
+type PanelSection = 'general' | 'appearance' | 'behavior';
 
 function buildProjectLabel(projectId: number, projects: VikunjaProject[]) {
   const lookup = new Map(projects.map((project) => [project.id, project]));
@@ -32,6 +34,9 @@ export function ManagerView() {
   const [settingsDraft, setSettingsDraft] = useState<AppSettings | null>(null);
   const [panelDrafts, setPanelDrafts] = useState<Record<string, PanelConfig>>({});
   const [secret, setSecret] = useState('');
+  const [activePanelId, setActivePanelId] = useState<string | null>(null);
+  const [activePanelSection, setActivePanelSection] = useState<PanelSection>('general');
+  const previousPanelCount = useRef(0);
 
   useEffect(() => {
     if (!manager) {
@@ -40,6 +45,19 @@ export function ManagerView() {
 
     setSettingsDraft(manager.settings);
     setPanelDrafts(Object.fromEntries(manager.panels.map((panel) => [panel.id, panel])));
+    const createdNewPanel = manager.panels.length > previousPanelCount.current;
+    previousPanelCount.current = manager.panels.length;
+    setActivePanelId((current) => {
+      if (createdNewPanel) {
+        return manager.panels.at(-1)?.id ?? null;
+      }
+
+      if (current && manager.panels.some((panel) => panel.id === current)) {
+        return current;
+      }
+
+      return manager.panels[0]?.id ?? null;
+    });
   }, [manager]);
 
   const projectLabels = useMemo(() => {
@@ -49,6 +67,15 @@ export function ManagerView() {
 
     return new Map(manager.projects.map((project) => [project.id, buildProjectLabel(project.id, manager.projects)]));
   }, [manager]);
+
+  const activePanel = activePanelId ? panelDrafts[activePanelId] ?? manager?.panels.find((panel) => panel.id === activePanelId) ?? null : null;
+
+  function setPanelDraft(panelId: string, next: PanelConfig) {
+    setPanelDrafts((current) => ({
+      ...current,
+      [panelId]: next
+    }));
+  }
 
   if (!manager || !settingsDraft) {
     return null;
@@ -154,7 +181,7 @@ export function ManagerView() {
               checked={settingsDraft.includeSubprojects}
               onChange={(event) => setSettingsDraft({ ...settingsDraft, includeSubprojects: event.target.checked })}
             />
-            <span>Include subprojects in selectors</span>
+            <span>Include subprojects in selectors and parent panel task rollups</span>
           </label>
           <div className="project-checklist">
             {manager.projects.map((project) => {
@@ -324,237 +351,253 @@ export function ManagerView() {
         <div className="section-header">
           <div>
             <h2>Panels</h2>
-            <p className="muted">Each sticky panel can target its own project, visual style, and notification behavior.</p>
+            <p className="muted">Each panel has its own tab, with grouped settings underneath.</p>
           </div>
           <button type="button" onClick={() => void createPanel()}>
             Create panel
           </button>
         </div>
 
-        <div className="panel-admin-list">
-          {manager.panels.map((panel) => {
-            const draft = panelDrafts[panel.id] ?? panel;
-            return (
-              <article key={panel.id} className="panel-admin-card">
-                <div className="field-grid field-grid--compact">
-                  <label>
-                    <span>Panel title</span>
-                    <input type="text" value={draft.name} readOnly title="Panel titles follow the selected project." />
-                  </label>
-                  <label>
-                    <span>Project</span>
-                    <select
-                      value={draft.projectId ?? ''}
-                      onChange={(event) => {
-                        const projectId = event.target.value ? Number(event.target.value) : null;
-                        const nextProjectLabel = projectId ? projectLabels.get(projectId) ?? '' : draft.name;
-                        setPanelDrafts((current) => ({
-                          ...current,
-                          [panel.id]: {
-                            ...draft,
-                            projectId,
-                            name: nextProjectLabel || draft.name
-                          }
-                        }));
-                      }}
+        {manager.panels.length === 0 ? (
+          <p className="empty-state">No panels yet. Create one to start configuring a sticky project panel.</p>
+        ) : (
+          <div className="panel-config-shell">
+            <div className="tab-strip">
+              {manager.panels.map((panel) => {
+                const draft = panelDrafts[panel.id] ?? panel;
+                return (
+                  <button
+                    key={panel.id}
+                    type="button"
+                    className={`tab-button ${activePanelId === panel.id ? 'tab-button--active' : ''}`}
+                    onClick={() => {
+                      setActivePanelId(panel.id);
+                      setActivePanelSection('general');
+                    }}
+                  >
+                    {draft.name}
+                  </button>
+                );
+              })}
+            </div>
+
+            {activePanel ? (
+              <>
+                <div className="subtab-strip">
+                  {(['general', 'appearance', 'behavior'] as PanelSection[]).map((section) => (
+                    <button
+                      key={section}
+                      type="button"
+                      className={`subtab-button ${activePanelSection === section ? 'subtab-button--active' : ''}`}
+                      onClick={() => setActivePanelSection(section)}
                     >
-                      <option value="">Choose project</option>
-                      {manager.projects.map((project) => (
-                        <option key={project.id} value={project.id}>
-                          {projectLabels.get(project.id) ?? project.title}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    <span>Sort</span>
-                    <select
-                      value={draft.sortMode}
-                      onChange={(event) =>
-                        setPanelDrafts((current) => ({
-                          ...current,
-                          [panel.id]: { ...draft, sortMode: event.target.value as PanelConfig['sortMode'] }
-                        }))
-                      }
-                    >
-                      <option value="vikunja">Vikunja order</option>
-                      <option value="dueDate">Due date</option>
-                      <option value="priority">Priority</option>
-                      <option value="newest">Newest first</option>
-                      <option value="oldest">Oldest first</option>
-                      <option value="alphabetical">Alphabetical</option>
-                      <option value="overdueFirst">Overdue first</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>Filter</span>
-                    <select
-                      value={draft.filterMode}
-                      onChange={(event) =>
-                        setPanelDrafts((current) => ({
-                          ...current,
-                          [panel.id]: { ...draft, filterMode: event.target.value as PanelConfig['filterMode'] }
-                        }))
-                      }
-                    >
-                      <option value="open">Open tasks only</option>
-                      <option value="dueToday">Due today</option>
-                      <option value="overdue">Overdue</option>
-                      <option value="dueEmphasis">Open with due emphasis</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>Display mode</span>
-                    <select
-                      value={draft.displayMode}
-                      onChange={(event) =>
-                        setPanelDrafts((current) => ({
-                          ...current,
-                          [panel.id]: { ...draft, displayMode: event.target.value as PanelConfig['displayMode'] }
-                        }))
-                      }
-                    >
-                      <option value="full">Full</option>
-                      <option value="minimized">Minimized</option>
-                      <option value="edge-docked">Edge-docked</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>Dock edge</span>
-                    <select
-                      value={draft.dockEdge}
-                      onChange={(event) =>
-                        setPanelDrafts((current) => ({
-                          ...current,
-                          [panel.id]: { ...draft, dockEdge: event.target.value as PanelConfig['dockEdge'] }
-                        }))
-                      }
-                    >
-                      <option value="left">Left</option>
-                      <option value="right">Right</option>
-                      <option value="top">Top</option>
-                      <option value="bottom">Bottom</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>Notify</span>
-                    <select
-                      value={draft.notificationMode}
-                      onChange={(event) =>
-                        setPanelDrafts((current) => ({
-                          ...current,
-                          [panel.id]: { ...draft, notificationMode: event.target.value as PanelConfig['notificationMode'] }
-                        }))
-                      }
-                    >
-                      <option value="default">Use global defaults</option>
-                      <option value="off">Off</option>
-                      <option value="dueToday">Due today</option>
-                      <option value="overdue">Overdue</option>
-                      <option value="dueTodayAndOverdue">Due today + overdue</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>Color</span>
-                    <input
-                      type="color"
-                      value={draft.backgroundColor}
-                      onChange={(event) =>
-                        setPanelDrafts((current) => ({
-                          ...current,
-                          [panel.id]: { ...draft, backgroundColor: event.target.value }
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    <span>Text color</span>
-                    <input
-                      type="color"
-                      value={draft.textColor}
-                      onChange={(event) =>
-                        setPanelDrafts((current) => ({
-                          ...current,
-                          [panel.id]: { ...draft, textColor: event.target.value }
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    <span>Font size</span>
-                    <input
-                      type="number"
-                      min={12}
-                      max={24}
-                      value={draft.fontSize}
-                      onChange={(event) =>
-                        setPanelDrafts((current) => ({
-                          ...current,
-                          [panel.id]: { ...draft, fontSize: Number(event.target.value) || 14 }
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    <span>Item limit</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={50}
-                      value={draft.itemCount}
-                      onChange={(event) =>
-                        setPanelDrafts((current) => ({
-                          ...current,
-                          [panel.id]: { ...draft, itemCount: Number(event.target.value) || 10 }
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    <span>Opacity</span>
-                    <input
-                      type="number"
-                      min={0.45}
-                      max={1}
-                      step={0.05}
-                      value={draft.opacity}
-                      onChange={(event) =>
-                        setPanelDrafts((current) => ({
-                          ...current,
-                          [panel.id]: { ...draft, opacity: Number(event.target.value) || 0.97 }
-                        }))
-                      }
-                    />
-                  </label>
+                      {section === 'general' ? 'General' : section === 'appearance' ? 'Appearance' : 'Behavior'}
+                    </button>
+                  ))}
                 </div>
 
+                {activePanelSection === 'general' ? (
+                  <div className="field-grid">
+                    <label>
+                      <span>Panel title</span>
+                      <input type="text" value={activePanel.name} readOnly title="Panel titles follow the selected project." />
+                    </label>
+                    <label>
+                      <span>Project</span>
+                      <select
+                        value={activePanel.projectId ?? ''}
+                        onChange={(event) => {
+                          const projectId = event.target.value ? Number(event.target.value) : null;
+                          const nextProjectLabel = projectId ? projectLabels.get(projectId) ?? '' : activePanel.name;
+                          setPanelDraft(activePanel.id, {
+                            ...activePanel,
+                            projectId,
+                            name: nextProjectLabel || activePanel.name
+                          });
+                        }}
+                      >
+                        <option value="">Choose project</option>
+                        {manager.projects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {projectLabels.get(project.id) ?? project.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Sort</span>
+                      <select
+                        value={activePanel.sortMode}
+                        onChange={(event) =>
+                          setPanelDraft(activePanel.id, {
+                            ...activePanel,
+                            sortMode: event.target.value as PanelConfig['sortMode']
+                          })
+                        }
+                      >
+                        <option value="vikunja">Vikunja order</option>
+                        <option value="dueDate">Due date</option>
+                        <option value="priority">Priority</option>
+                        <option value="newest">Newest first</option>
+                        <option value="oldest">Oldest first</option>
+                        <option value="alphabetical">Alphabetical</option>
+                        <option value="overdueFirst">Overdue first</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Filter</span>
+                      <select
+                        value={activePanel.filterMode}
+                        onChange={(event) =>
+                          setPanelDraft(activePanel.id, {
+                            ...activePanel,
+                            filterMode: event.target.value as PanelConfig['filterMode']
+                          })
+                        }
+                      >
+                        <option value="open">Open tasks only</option>
+                        <option value="dueToday">Due today</option>
+                        <option value="overdue">Overdue</option>
+                        <option value="dueEmphasis">Open with due emphasis</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Item limit</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={activePanel.itemCount}
+                        onChange={(event) =>
+                          setPanelDraft(activePanel.id, {
+                            ...activePanel,
+                            itemCount: Number(event.target.value) || 10
+                          })
+                        }
+                      />
+                    </label>
+                  </div>
+                ) : null}
+
+                {activePanelSection === 'appearance' ? (
+                  <div className="field-grid">
+                    <label>
+                      <span>Color</span>
+                      <input
+                        type="color"
+                        value={activePanel.backgroundColor}
+                        onChange={(event) => setPanelDraft(activePanel.id, { ...activePanel, backgroundColor: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      <span>Text color</span>
+                      <input
+                        type="color"
+                        value={activePanel.textColor}
+                        onChange={(event) => setPanelDraft(activePanel.id, { ...activePanel, textColor: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      <span>Font size</span>
+                      <input
+                        type="number"
+                        min={12}
+                        max={24}
+                        value={activePanel.fontSize}
+                        onChange={(event) => setPanelDraft(activePanel.id, { ...activePanel, fontSize: Number(event.target.value) || 14 })}
+                      />
+                    </label>
+                    <label>
+                      <span>Opacity</span>
+                      <input
+                        type="number"
+                        min={0.45}
+                        max={1}
+                        step={0.05}
+                        value={activePanel.opacity}
+                        onChange={(event) => setPanelDraft(activePanel.id, { ...activePanel, opacity: Number(event.target.value) || 0.97 })}
+                      />
+                    </label>
+                  </div>
+                ) : null}
+
+                {activePanelSection === 'behavior' ? (
+                  <div className="field-grid">
+                    <label>
+                      <span>Display mode</span>
+                      <select
+                        value={activePanel.displayMode}
+                        onChange={(event) =>
+                          setPanelDraft(activePanel.id, {
+                            ...activePanel,
+                            displayMode: event.target.value as PanelConfig['displayMode']
+                          })
+                        }
+                      >
+                        <option value="full">Full</option>
+                        <option value="minimized">Minimized</option>
+                        <option value="edge-docked">Edge-docked</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Dock edge</span>
+                      <select
+                        value={activePanel.dockEdge}
+                        onChange={(event) =>
+                          setPanelDraft(activePanel.id, {
+                            ...activePanel,
+                            dockEdge: event.target.value as PanelConfig['dockEdge']
+                          })
+                        }
+                      >
+                        <option value="left">Left</option>
+                        <option value="right">Right</option>
+                        <option value="top">Top</option>
+                        <option value="bottom">Bottom</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Notify</span>
+                      <select
+                        value={activePanel.notificationMode}
+                        onChange={(event) =>
+                          setPanelDraft(activePanel.id, {
+                            ...activePanel,
+                            notificationMode: event.target.value as PanelConfig['notificationMode']
+                          })
+                        }
+                      >
+                        <option value="default">Use global defaults</option>
+                        <option value="off">Off</option>
+                        <option value="dueToday">Due today</option>
+                        <option value="overdue">Overdue</option>
+                        <option value="dueTodayAndOverdue">Due today + overdue</option>
+                      </select>
+                    </label>
+                    <label className="toggle-row toggle-row--card">
+                      <input
+                        type="checkbox"
+                        checked={activePanel.alwaysOnTop}
+                        onChange={(event) => setPanelDraft(activePanel.id, { ...activePanel, alwaysOnTop: event.target.checked })}
+                      />
+                      <span>Always on top</span>
+                    </label>
+                  </div>
+                ) : null}
+
                 <div className="inline-actions">
-                  <label className="toggle-row">
-                    <input
-                      type="checkbox"
-                      checked={draft.alwaysOnTop}
-                      onChange={(event) =>
-                        setPanelDrafts((current) => ({
-                          ...current,
-                          [panel.id]: { ...draft, alwaysOnTop: event.target.checked }
-                        }))
-                      }
-                    />
-                    <span>Always on top</span>
-                  </label>
-                  <button className="secondary" type="button" onClick={() => void updatePanel(draft)}>
+                  <button className="secondary" type="button" onClick={() => void updatePanel(activePanel)}>
                     Save panel
                   </button>
-                  <button className="ghost-button" type="button" onClick={() => void deletePanel(panel.id)}>
-                    Delete
+                  <button className="ghost-button" type="button" onClick={() => void deletePanel(activePanel.id)}>
+                    Delete panel
                   </button>
                 </div>
-              </article>
-            );
-          })}
-        </div>
+              </>
+            ) : null}
+          </div>
+        )}
       </section>
     </div>
   );
 }
-

@@ -461,3 +461,46 @@ label {
   color: #d6dce7;
   line-height: 1.5;
 }
+
+
+.tab-strip,
+.subtab-strip {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.subtab-strip {
+  margin-bottom: 16px;
+}
+
+.tab-button,
+.subtab-button {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ecf2fa;
+  font-weight: 600;
+}
+
+.tab-button--active,
+.subtab-button--active {
+  background: #ffc86d;
+  color: #2a1f07;
+  border-color: transparent;
+}
+
+.panel-config-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.toggle-row--card {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+}

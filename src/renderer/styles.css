@@ -235,11 +235,13 @@ label {
 }
 
 .panel-shell {
+  position: relative;
   min-height: 100vh;
   padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow: visible;
 }
 
 .panel-shell--edge-docked {
@@ -265,9 +267,23 @@ label {
 }
 
 .panel-menu {
+  position: absolute;
+  top: 16px;
+  width: 240px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  color: #eff3f8;
+  background: rgba(13, 17, 24, 0.95);
+  z-index: 20;
+}
+
+.panel-menu--right {
+  left: calc(100% + 12px);
+}
+
+.panel-menu--left {
+  right: calc(100% + 12px);
 }
 
 .panel-banner {
@@ -275,6 +291,12 @@ label {
   padding: 8px 10px;
   border-radius: 12px;
   background: rgba(85, 116, 255, 0.14);
+}
+
+.panel-menu label span,
+.panel-menu .toggle-row span,
+.panel-menu .muted {
+  color: #eff3f8;
 }
 
 .quick-add {
@@ -373,6 +395,17 @@ label {
 }
 
 @media (max-width: 1080px) {
+  .panel-menu {
+    position: static;
+    width: auto;
+  }
+
+  .panel-menu--right,
+  .panel-menu--left {
+    left: auto;
+    right: auto;
+  }
+
   .manager-grid {
     grid-template-columns: 1fr;
   }

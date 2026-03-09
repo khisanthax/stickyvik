@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { PanelConfig, VikunjaTask } from '../../shared/types';
+import type { PanelConfig, VikunjaTask, VikunjaProject } from '../../shared/types';
 import { useAppStore } from '../store/useAppStore';
 
 function formatDue(dateValue: string | null) {
@@ -9,6 +9,19 @@ function formatDue(dateValue: string | null) {
   }
 
   return new Date(dateValue).toLocaleDateString();
+}
+
+function buildProjectLabel(projectId: number, projects: VikunjaProject[]) {
+  const lookup = new Map(projects.map((project) => [project.id, project]));
+  const parts: string[] = [];
+  let current = lookup.get(projectId) ?? null;
+
+  while (current) {
+    parts.unshift(current.title);
+    current = current.parentProjectId ? lookup.get(current.parentProjectId) ?? null : null;
+  }
+
+  return parts.join(' / ');
 }
 
 export function PanelView() {
@@ -39,6 +52,10 @@ export function PanelView() {
   }, []);
 
   const projectOptions = useMemo(() => panelBootstrap?.projects ?? [], [panelBootstrap]);
+  const projectLabels = useMemo(
+    () => new Map(projectOptions.map((project) => [project.id, buildProjectLabel(project.id, projectOptions)])),
+    [projectOptions]
+  );
 
   if (!panelBootstrap) {
     return null;
@@ -86,7 +103,7 @@ export function PanelView() {
     >
       <header className="sticky-header">
         <div>
-          <p className="eyebrow">{projectOptions.find((project) => project.id === panel.projectId)?.title ?? 'Choose project'}</p>
+          <p className="eyebrow">{panel.projectId ? projectLabels.get(panel.projectId) ?? 'Choose project' : 'Choose project'}</p>
           <h1>{panel.name}</h1>
         </div>
         <button
@@ -101,7 +118,7 @@ export function PanelView() {
       </header>
 
       {menuOpen ? (
-        <section className="panel-menu card-inline">
+        <section className={`panel-menu card-inline ${panel.dockEdge === 'right' ? 'panel-menu--left' : 'panel-menu--right'}`}>
           <label>
             <span>Project</span>
             <select
@@ -119,7 +136,7 @@ export function PanelView() {
               <option value="">Choose project</option>
               {projectOptions.map((project) => (
                 <option key={project.id} value={project.id}>
-                  {project.title}
+                  {projectLabels.get(project.id) ?? project.title}
                 </option>
               ))}
             </select>
@@ -194,7 +211,11 @@ export function PanelView() {
           </section>
 
           <section className="task-list">
-            {panelBootstrap.tasks.length === 0 ? <p className="empty-state">No matching tasks for this panel.</p> : null}
+            {panelBootstrap.tasks.length === 0 ? (
+              <p className="empty-state">
+                No matching tasks in {panel.projectId ? projectLabels.get(panel.projectId) ?? 'this project' : 'this panel'}.
+              </p>
+            ) : null}
             {panelBootstrap.tasks.map((task) => (
               <article key={task.id} className={`task-row ${task.done ? 'task-row--done' : ''}`}>
                 <input

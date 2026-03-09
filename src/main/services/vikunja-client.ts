@@ -240,22 +240,58 @@ export async function fetchProjects(settings: AppSettings) {
   return rawProjects.map(mapProject);
 }
 
-export async function fetchTasksForPanel(settings: AppSettings, panel: PanelConfig) {
+function getPanelProjectIds(settings: AppSettings, panel: PanelConfig, projects: VikunjaProject[]) {
   if (!panel.projectId) {
+    return [] as number[];
+  }
+
+  if (!settings.includeSubprojects) {
+    return [panel.projectId];
+  }
+
+  const ids = new Set<number>();
+  const queue = [panel.projectId];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (current === undefined || ids.has(current)) {
+      continue;
+    }
+
+    ids.add(current);
+    for (const project of projects) {
+      if (project.parentProjectId === current) {
+        queue.push(project.id);
+      }
+    }
+  }
+
+  return [...ids];
+}
+
+export async function fetchTasksForPanel(settings: AppSettings, panel: PanelConfig, projects: VikunjaProject[] = []) {
+  const projectIds = getPanelProjectIds(settings, panel, projects);
+  if (projectIds.length === 0) {
     return [] as VikunjaTask[];
   }
 
-  const rawTasks = await request<Record<string, unknown>[]>(settings, `/projects/${panel.projectId}/tasks`);
-  const mapped = rawTasks.map(mapTask).filter((task) => task.projectId === panel.projectId || task.projectId === 0);
-  return sortAndFilterTasks(
-    mapped.map((task) => ({
-      ...task,
-      projectId: task.projectId || panel.projectId || 0
-    })),
-    panel.sortMode,
-    panel.filterMode,
-    panel.itemCount
+  const rawTaskGroups = await Promise.all(
+    projectIds.map(async (projectId) => ({
+      projectId,
+      tasks: await request<Record<string, unknown>[]>(settings, `/projects/${projectId}/tasks`)
+    }))
   );
+
+  const deduped = new Map<number, VikunjaTask>();
+  for (const group of rawTaskGroups) {
+    for (const task of group.tasks.map(mapTask)) {
+      deduped.set(task.id, {
+        ...task,
+        projectId: task.projectId || group.projectId
+      });
+    }
+  }
+
+  return sortAndFilterTasks([...deduped.values()], panel.sortMode, panel.filterMode, panel.itemCount);
 }
 
 export async function createTask(settings: AppSettings, projectId: number, title: string) {

@@ -11,7 +11,7 @@ Implemented in the current branch:
 - Tray controller with create panel, show/hide, sync, settings, pause always-on-top, and quit actions
 - Manager window with connection settings, allowed project selection, defaults, and persisted panel management
 - Secure credential storage via `keytar`
-- Multiple floating sticky panels with per-panel project selection, auto-mirrored project titles, style overrides, minimized mode, and edge-docked hover-expand behavior
+- Multiple floating sticky panels with per-panel project selection, auto-mirrored project titles, subproject-aware task aggregation, style overrides, minimized mode, and edge-docked hover-expand behavior
 - Native lightweight task details windows for title, project move, notes, and completion actions
 - Runtime-stabilized dock hover handling, monitor-change reconciliation, and monitor-aware restore fallback
 - Vikunja API client layer for test connection, project fetch, task fetch, create task, complete task, rename task, move task, and details fetch

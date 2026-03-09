@@ -7,7 +7,7 @@ Windows-first Electron desktop companion for Vikunja with a tray controller, a m
 ## MVP scope
 
 - Secure Vikunja connection and test flow
-- Allowed-project privacy controls
+- Allowed-project privacy controls and parent-project panel aggregation when subprojects are enabled
 - Tray controller for panel lifecycle and sync
 - Multiple sticky panels with per-panel project selection and style overrides
 - Open-task display, quick add, complete, rename, move, and details view

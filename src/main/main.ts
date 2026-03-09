@@ -364,7 +364,7 @@ async function syncAll() {
         continue;
       }
 
-      const tasks = await fetchTasksForPanel(settings, panel);
+      const tasks = await fetchTasksForPanel(settings, panel, projects);
       setTaskCache(panel.id, tasks);
     }
 
@@ -395,9 +395,11 @@ async function ensureManagerWindow() {
   }
 
   managerWindow = createManagerWindow();
-  windowContexts.set(managerWindow.webContents.id, { view: 'manager' });
+  const managerWindowId = managerWindow.webContents.id;
+  windowContexts.set(managerWindowId, { view: 'manager' });
   managerWindow.on('ready-to-show', () => managerWindow?.show());
   managerWindow.on('closed', () => {
+    windowContexts.delete(managerWindowId);
     managerWindow = null;
   });
   await loadWindow(managerWindow, { view: 'manager' });
@@ -441,13 +443,14 @@ async function createOrShowPanelWindow(panel: PanelConfig) {
   }
 
   const window = createPanelWindow(getEffectivePanel(panel), getSettings().pauseAlwaysOnTop);
+  const panelWindowId = window.webContents.id;
   panelWindows.set(panel.id, window);
   panelRuntime.set(panel.id, {
     hovered: false,
     focused: false,
     expanded: false
   });
-  windowContexts.set(window.webContents.id, { view: 'panel', panelId: panel.id });
+  windowContexts.set(panelWindowId, { view: 'panel', panelId: panel.id });
 
   window.on('ready-to-show', () => window.show());
   window.on('show', () => {
@@ -497,7 +500,7 @@ async function createOrShowPanelWindow(panel: PanelConfig) {
     panelWindows.delete(panel.id);
     clearPanelRuntimeTimer(panel.id);
     panelRuntime.delete(panel.id);
-    windowContexts.delete(window.webContents.id);
+    windowContexts.delete(panelWindowId);
     if (!isQuitting && !suppressPanelDeletion) {
       setPanels(getPanels().filter((entry) => entry.id !== panel.id));
       removeTaskCache(panel.id);
@@ -525,12 +528,13 @@ async function createOrShowDetailsWindow(panelId: string, taskId: number) {
 
   const parent = panelWindows.get(panelId);
   const window = createDetailsWindow(parent);
+  const detailsWindowId = window.webContents.id;
   detailsWindows.set(key, window);
-  windowContexts.set(window.webContents.id, { view: 'details', panelId, taskId });
+  windowContexts.set(detailsWindowId, { view: 'details', panelId, taskId });
   window.on('ready-to-show', () => window.show());
   window.on('closed', () => {
     detailsWindows.delete(key);
-    windowContexts.delete(window.webContents.id);
+    windowContexts.delete(detailsWindowId);
   });
   await loadWindow(window, { view: 'details', panelId, taskId });
   return window;
@@ -641,7 +645,7 @@ async function updatePanel(panel: PanelConfig) {
   applyPanelWindowState(window, getEffectivePanel(nextPanel), getSettings().pauseAlwaysOnTop);
   if (nextPanel.projectId) {
     try {
-      const tasks = await fetchTasksForPanel(getSettings(), nextPanel);
+      const tasks = await fetchTasksForPanel(getSettings(), nextPanel, getProjects());
       setTaskCache(panel.id, tasks);
     } catch {
       // Keep the existing cache when a panel-specific refresh fails.
@@ -675,7 +679,7 @@ async function refreshSinglePanel(panelId: string) {
     return;
   }
 
-  const tasks = await fetchTasksForPanel(getSettings(), panel);
+  const tasks = await fetchTasksForPanel(getSettings(), panel, getProjects());
   setTaskCache(panelId, tasks);
 }
 

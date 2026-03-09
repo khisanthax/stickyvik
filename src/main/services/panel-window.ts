@@ -5,7 +5,8 @@ import type { BoundsState, PanelConfig, WindowContext } from '../../shared/types
 
 const PANEL_MARGIN = 12;
 const TITLE_ONLY_HEIGHT = 68;
-const EDGE_THICKNESS = 46;
+const SIDE_DOCK_THICKNESS = 68;
+const HORIZONTAL_DOCK_THICKNESS = 46;
 const MIN_WIDTH = 240;
 const MIN_HEIGHT = 180;
 
@@ -65,7 +66,7 @@ function getDockedBounds(panel: PanelConfig) {
     return {
       x: area.x,
       y: expanded.y,
-      width: expandedMode ? expanded.width : EDGE_THICKNESS,
+      width: expandedMode ? expanded.width : SIDE_DOCK_THICKNESS,
       height: expanded.height,
       displayId: display.id
     };
@@ -73,9 +74,9 @@ function getDockedBounds(panel: PanelConfig) {
 
   if (panel.dockEdge === 'right') {
     return {
-      x: expandedMode ? area.x + area.width - expanded.width : area.x + area.width - EDGE_THICKNESS,
+      x: expandedMode ? area.x + area.width - expanded.width : area.x + area.width - SIDE_DOCK_THICKNESS,
       y: expanded.y,
-      width: expandedMode ? expanded.width : EDGE_THICKNESS,
+      width: expandedMode ? expanded.width : SIDE_DOCK_THICKNESS,
       height: expanded.height,
       displayId: display.id
     };
@@ -86,16 +87,16 @@ function getDockedBounds(panel: PanelConfig) {
       x: expanded.x,
       y: area.y,
       width: expanded.width,
-      height: expandedMode ? expanded.height : EDGE_THICKNESS,
+      height: expandedMode ? expanded.height : HORIZONTAL_DOCK_THICKNESS,
       displayId: display.id
     };
   }
 
   return {
     x: expanded.x,
-    y: expandedMode ? area.y + area.height - expanded.height : area.y + area.height - EDGE_THICKNESS,
+    y: expandedMode ? area.y + area.height - expanded.height : area.y + area.height - HORIZONTAL_DOCK_THICKNESS,
     width: expanded.width,
-    height: expandedMode ? expanded.height : EDGE_THICKNESS,
+    height: expandedMode ? expanded.height : HORIZONTAL_DOCK_THICKNESS,
     displayId: display.id
   };
 }

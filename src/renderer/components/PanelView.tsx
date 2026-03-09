@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 
 import type { PanelConfig, VikunjaProject, VikunjaTask } from '../../shared/types';
 import { useAppStore } from '../store/useAppStore';
@@ -22,6 +22,77 @@ function buildProjectLabel(projectId: number, projects: VikunjaProject[]) {
   }
 
   return parts.join(' / ');
+}
+
+function parseHexColor(value: string) {
+  const trimmed = value.trim();
+  const normalized = trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
+
+  if (normalized.length === 3) {
+    return normalized.split('').map((segment) => Number.parseInt(`${segment}${segment}`, 16)) as [number, number, number];
+  }
+
+  if (normalized.length === 6) {
+    return [
+      Number.parseInt(normalized.slice(0, 2), 16),
+      Number.parseInt(normalized.slice(2, 4), 16),
+      Number.parseInt(normalized.slice(4, 6), 16)
+    ] as [number, number, number];
+  }
+
+  return null;
+}
+
+function toLinear(channel: number) {
+  const value = channel / 255;
+  return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+}
+
+function getLuminance(color: [number, number, number]) {
+  return 0.2126 * toLinear(color[0]) + 0.7152 * toLinear(color[1]) + 0.0722 * toLinear(color[2]);
+}
+
+function getContrastRatio(background: string, foreground: string) {
+  const backgroundRgb = parseHexColor(background);
+  const foregroundRgb = parseHexColor(foreground);
+  if (!backgroundRgb || !foregroundRgb) {
+    return 0;
+  }
+
+  const backgroundLum = getLuminance(backgroundRgb);
+  const foregroundLum = getLuminance(foregroundRgb);
+  const lighter = Math.max(backgroundLum, foregroundLum);
+  const darker = Math.min(backgroundLum, foregroundLum);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function getAutoTextColor(background: string) {
+  const dark = '#1f1400';
+  const light = '#f8fafc';
+  return getContrastRatio(background, dark) >= getContrastRatio(background, light) ? dark : light;
+}
+
+function resolvePanelTextColor(background: string, preferred: string) {
+  const automatic = getAutoTextColor(background);
+  return getContrastRatio(background, preferred) >= 4.5 ? preferred : automatic;
+}
+
+function rgbaFromHex(value: string, alpha: number) {
+  const rgb = parseHexColor(value);
+  if (!rgb) {
+    return `rgba(15, 23, 42, ${alpha})`;
+  }
+
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
+}
+
+function getPanelButtonFill(background: string) {
+  const rgb = parseHexColor(background);
+  if (!rgb) {
+    return 'rgba(0, 0, 0, 0.15)';
+  }
+
+  return getLuminance(rgb) > 0.6 ? 'rgba(0, 0, 0, 0.14)' : 'rgba(255, 255, 255, 0.16)';
 }
 
 export function PanelView() {
@@ -65,12 +136,16 @@ export function PanelView() {
   const projectLabel = panel.projectId ? projectLabels.get(panel.projectId) ?? 'Choose project' : 'Choose project';
   const isCollapsedDock = panel.displayMode === 'edge-docked' && !panel.hoverExpanded;
   const showDates = panel.showDueDates;
+  const resolvedTextColor = resolvePanelTextColor(panel.backgroundColor, panel.textColor);
   const textStyle = {
     background: panel.backgroundColor,
-    color: panel.textColor,
+    color: resolvedTextColor,
     fontSize: `${panel.fontSize}px`,
-    opacity: panel.opacity
-  };
+    opacity: panel.opacity,
+    '--panel-subtle-color': rgbaFromHex(resolvedTextColor, 0.78),
+    '--panel-border-color': rgbaFromHex(resolvedTextColor, 0.18),
+    '--panel-button-fill': getPanelButtonFill(panel.backgroundColor)
+  } as CSSProperties;
 
   function handleTaskClick(task: VikunjaTask) {
     clickTimer.current = window.setTimeout(() => {

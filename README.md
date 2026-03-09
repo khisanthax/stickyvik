@@ -11,7 +11,7 @@ Implemented in the current branch:
 - Tray controller with create panel, show/hide, sync, settings, pause always-on-top, and quit actions
 - Manager window with connection settings, allowed project selection, defaults, and persisted panel management
 - Secure credential storage via `keytar`
-- Multiple floating sticky panels with per-panel project selection, auto-mirrored project titles, subproject-aware task aggregation, style overrides, minimized mode with double-click restore, and edge-docked hover-expand behavior with configurable auto-hide timing
+- Multiple floating sticky panels with per-panel project selection, auto-mirrored project titles, subproject-aware task aggregation, style overrides, minimized mode with double-click restore, automatic contrast-aware panel text, and edge-docked hover-expand behavior with configurable auto-hide timing
 - Native lightweight task details windows for title, project move, notes, and completion actions
 - Runtime-stabilized dock hover handling, monitor-change reconciliation, and monitor-aware restore fallback
 - Vikunja API client layer for test connection, project fetch, task fetch, create task, complete task, rename task, move task, and details fetch
@@ -35,7 +35,7 @@ Implemented in the current branch:
 ## Configuration notes
 
 - Due dates are hidden in panel rows by default and can be enabled globally or per panel
-- Docked panels can use per-panel auto-hide timing and inline transparency controls from the panel menu
+- Docked panels use a wider visible side strip for collapsed left/right titles, plus per-panel auto-hide timing and inline transparency controls from the panel menu
 
 - Vikunja server URL and non-secret app settings are stored locally in the app store
 - Credentials or tokens are stored with `keytar`

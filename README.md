@@ -14,6 +14,7 @@ Implemented in the current branch:
 - Multiple floating sticky panels with per-panel project selection, style overrides, minimized mode, and edge-docked hover-expand scaffolding
 - Vikunja API client layer for test connection, project fetch, task fetch, create task, complete task, rename task, move task, and details fetch
 - Restore of saved panels and their monitor/bounds data on startup
+- Basic due-today and overdue desktop notifications
 
 ## Development
 
@@ -40,7 +41,7 @@ Implemented in the current branch:
 
 - The Vikunja API layer is implemented against the common `/api/v1` endpoints and may need endpoint adjustments for older server versions
 - Edge-docked hover-expand is implemented as the window-management path, but still needs additional polish to reduce edge-case flicker
-- Notification rules are scaffolded in settings but not yet surfaced as desktop notifications
+- Notification rules currently cover basic due-today and overdue desktop notifications only
 - The details interaction is currently a lightweight modal instead of a separate native details window
 
 ## TODO after MVP

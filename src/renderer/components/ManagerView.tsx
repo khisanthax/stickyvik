@@ -398,6 +398,49 @@ export function ManagerView() {
                     />
                   </label>
                   <label>
+                    <span>Text color</span>
+                    <input
+                      type="color"
+                      value={draft.textColor}
+                      onChange={(event) =>
+                        setPanelDrafts((current) => ({
+                          ...current,
+                          [panel.id]: { ...draft, textColor: event.target.value }
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    <span>Font size</span>
+                    <input
+                      type="number"
+                      min={12}
+                      max={24}
+                      value={draft.fontSize}
+                      onChange={(event) =>
+                        setPanelDrafts((current) => ({
+                          ...current,
+                          [panel.id]: { ...draft, fontSize: Number(event.target.value) || 14 }
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    <span>Item limit</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={draft.itemCount}
+                      onChange={(event) =>
+                        setPanelDrafts((current) => ({
+                          ...current,
+                          [panel.id]: { ...draft, itemCount: Number(event.target.value) || 10 }
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
                     <span>Opacity</span>
                     <input
                       type="number"

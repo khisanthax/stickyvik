@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, Notification } from 'electron';
 
 import type { AppSettings, ManagerBootstrap, PanelBootstrap, PanelConfig, SyncState, WindowContext } from '../shared/types';
 import { clearStoredSecret, loadStoredSecret, saveStoredSecret } from './services/credentials';
@@ -40,6 +40,7 @@ let managerWindow: BrowserWindow | null = null;
 const panelWindows = new Map<string, BrowserWindow>();
 const windowContexts = new Map<number, WindowContext>();
 const hoverTimers = new Map<string, NodeJS.Timeout>();
+const notificationMemory = new Set<string>();
 let tray = makeTray();
 let isQuitting = false;
 let syncTimer: NodeJS.Timeout | null = null;
@@ -121,6 +122,43 @@ function applyLoginItemSettings(settings: AppSettings) {
   });
 }
 
+function dispatchNotifications() {
+  const settings = getSettings();
+  if (!settings.notifications.enabled) {
+    return;
+  }
+
+  for (const panel of getPanels()) {
+    const tasks = getTaskCache(panel.id);
+    for (const task of tasks) {
+      if (!task.dueDate || task.done) {
+        continue;
+      }
+
+      const due = new Date(task.dueDate);
+      const isDueToday = due.toDateString() === new Date().toDateString();
+      const isOverdue = due.getTime() < Date.now();
+      const shouldNotify =
+        (settings.notifications.dueToday && isDueToday) ||
+        (settings.notifications.overdue && isOverdue);
+      if (!shouldNotify) {
+        continue;
+      }
+
+      const key = `${panel.id}:${task.id}:${isOverdue ? 'overdue' : 'today'}`;
+      if (notificationMemory.has(key)) {
+        continue;
+      }
+
+      notificationMemory.add(key);
+      new Notification({
+        title: `${panel.name}: ${task.title}`,
+        body: isOverdue ? 'This task is overdue in Vikunja Sticky.' : 'This task is due today in Vikunja Sticky.'
+      }).show();
+    }
+  }
+}
+
 async function syncAll() {
   const settings = getSettings();
   const secret = await loadStoredSecret();
@@ -156,6 +194,7 @@ async function syncAll() {
     }
 
     const now = new Date().toISOString();
+    dispatchNotifications();
     setSyncState({
       status: 'ready',
       lastSyncAt: now,
@@ -550,3 +589,4 @@ app.on('before-quit', () => {
 app.on('window-all-closed', () => {
   // The tray app stays resident even when all windows are closed.
 });
+

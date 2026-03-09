@@ -24,6 +24,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     filterMode: 'open',
     notificationMode: 'default',
     notificationsEnabled: false,
+    showDueDates: false,
+    dockAutoHideDelayMs: 900,
     alwaysOnTop: true,
     displayMode: 'full',
     dockEdge: 'right'
@@ -66,6 +68,8 @@ function normalizePanel(panel: Partial<PanelConfig>, index: number, settings: Ap
     sortMode: panel.sortMode ?? settings.defaults.sortMode,
     filterMode: panel.filterMode ?? settings.defaults.filterMode,
     notificationMode: panel.notificationMode ?? settings.defaults.notificationMode,
+    showDueDates: panel.showDueDates ?? settings.defaults.showDueDates,
+    dockAutoHideDelayMs: panel.dockAutoHideDelayMs ?? settings.defaults.dockAutoHideDelayMs,
     alwaysOnTop: panel.alwaysOnTop ?? settings.defaults.alwaysOnTop,
     displayMode: panel.displayMode ?? settings.defaults.displayMode,
     dockEdge: panel.dockEdge ?? settings.defaults.dockEdge,

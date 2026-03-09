@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { PanelConfig, VikunjaTask, VikunjaProject } from '../../shared/types';
+import type { PanelConfig, VikunjaProject, VikunjaTask } from '../../shared/types';
 import { useAppStore } from '../store/useAppStore';
 
 function formatDue(dateValue: string | null) {
@@ -62,6 +62,9 @@ export function PanelView() {
   }
 
   const panel = panelBootstrap.panel;
+  const projectLabel = panel.projectId ? projectLabels.get(panel.projectId) ?? 'Choose project' : 'Choose project';
+  const isCollapsedDock = panel.displayMode === 'edge-docked' && !panel.hoverExpanded;
+  const showDates = panel.showDueDates;
   const textStyle = {
     background: panel.backgroundColor,
     color: panel.textColor,
@@ -94,27 +97,44 @@ export function PanelView() {
     setTaskDraft('');
   }
 
+  function updatePanelField(next: Partial<PanelConfig>) {
+    void updatePanel({
+      ...panel,
+      ...next
+    });
+  }
+
   return (
     <div
-      className={`panel-shell panel-shell--${panel.displayMode}`}
+      className={`panel-shell panel-shell--${panel.displayMode} ${isCollapsedDock ? `panel-shell--collapsed panel-shell--dock-${panel.dockEdge}` : ''}`}
       style={textStyle}
       onMouseEnter={() => void setPanelHoverState(panel.id, true)}
       onMouseLeave={() => void setPanelHoverState(panel.id, false)}
     >
       <header className="sticky-header">
-        <div>
-          <p className="eyebrow">{panel.projectId ? projectLabels.get(panel.projectId) ?? 'Choose project' : 'Choose project'}</p>
-          <h1>{panel.name}</h1>
-        </div>
-        <button
-          className="menu-button"
-          type="button"
-          title="Open panel menu"
-          aria-label="Open panel menu"
-          onClick={() => setMenuOpen((current) => !current)}
+        <div
+          className={`sticky-header__titles ${isCollapsedDock ? 'sticky-header__titles--collapsed' : ''}`}
+          title={panel.displayMode === 'minimized' ? 'Double-click to restore full mode' : undefined}
+          onDoubleClick={() => {
+            if (panel.displayMode === 'minimized') {
+              void togglePanelMinimized(panel.id);
+            }
+          }}
         >
-          Menu
-        </button>
+          <p className={`eyebrow ${isCollapsedDock ? 'eyebrow--docked' : ''}`}>{projectLabel}</p>
+          {!isCollapsedDock ? <h1>{panel.name}</h1> : null}
+        </div>
+        {!isCollapsedDock ? (
+          <button
+            className="menu-button"
+            type="button"
+            title="Open panel menu"
+            aria-label="Open panel menu"
+            onClick={() => setMenuOpen((current) => !current)}
+          >
+            Menu
+          </button>
+        ) : null}
       </header>
 
       {menuOpen ? (
@@ -126,8 +146,7 @@ export function PanelView() {
               onChange={(event) => {
                 const projectId = event.target.value ? Number(event.target.value) : null;
                 const nextProject = projectOptions.find((project) => project.id === projectId);
-                void updatePanel({
-                  ...panel,
+                updatePanelField({
                   projectId,
                   name: nextProject?.title ?? panel.name
                 });
@@ -146,8 +165,7 @@ export function PanelView() {
             <select
               value={panel.displayMode}
               onChange={(event) =>
-                void updatePanel({
-                  ...panel,
+                updatePanelField({
                   displayMode: event.target.value as PanelConfig['displayMode']
                 })
               }
@@ -162,8 +180,7 @@ export function PanelView() {
             <select
               value={panel.dockEdge}
               onChange={(event) =>
-                void updatePanel({
-                  ...panel,
+                updatePanelField({
                   dockEdge: event.target.value as PanelConfig['dockEdge']
                 })
               }
@@ -173,6 +190,38 @@ export function PanelView() {
               <option value="top">Top</option>
               <option value="bottom">Bottom</option>
             </select>
+          </label>
+          <label>
+            <span>Transparency</span>
+            <input
+              type="range"
+              min={0.45}
+              max={1}
+              step={0.05}
+              value={panel.opacity}
+              onChange={(event) => updatePanelField({ opacity: Number(event.target.value) || panel.opacity })}
+            />
+            <span className="muted">{Math.round(panel.opacity * 100)}%</span>
+          </label>
+          <label>
+            <span>Dock auto-hide</span>
+            <input
+              type="range"
+              min={200}
+              max={5000}
+              step={100}
+              value={panel.dockAutoHideDelayMs}
+              onChange={(event) => updatePanelField({ dockAutoHideDelayMs: Number(event.target.value) || panel.dockAutoHideDelayMs })}
+            />
+            <span className="muted">{(panel.dockAutoHideDelayMs / 1000).toFixed(1)}s</span>
+          </label>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={panel.showDueDates}
+              onChange={(event) => updatePanelField({ showDueDates: event.target.checked })}
+            />
+            <span>Show due dates</span>
           </label>
           <div className="inline-actions">
             <button className="secondary" type="button" onClick={() => void togglePanelMinimized(panel.id)}>
@@ -190,7 +239,7 @@ export function PanelView() {
 
       {syncError ? <p className="panel-banner">Offline cache shown: {syncError}</p> : null}
 
-      {panel.displayMode !== 'minimized' ? (
+      {panel.displayMode !== 'minimized' && !isCollapsedDock ? (
         <>
           <section className="quick-add">
             <input
@@ -213,7 +262,7 @@ export function PanelView() {
           <section className="task-list">
             {panelBootstrap.tasks.length === 0 ? (
               <p className="empty-state">
-                No matching tasks in {panel.projectId ? projectLabels.get(panel.projectId) ?? 'this project' : 'this panel'}.
+                No matching tasks in {panel.projectId ? projectLabel : 'this panel'}.
               </p>
             ) : null}
             {panelBootstrap.tasks.map((task) => (
@@ -258,7 +307,7 @@ export function PanelView() {
                   )}
                   <div className="task-row__meta">
                     {task.priority ? <span>P{task.priority}</span> : null}
-                    {task.dueDate ? <span>{formatDue(task.dueDate)}</span> : null}
+                    {showDates && task.dueDate ? <span>{formatDue(task.dueDate)}</span> : null}
                   </div>
                 </div>
               </article>

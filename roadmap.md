@@ -44,9 +44,9 @@ Windows-first Electron desktop companion for Vikunja with a tray controller, a m
 ### Phase 4: Sticky panels
 
 - Multiple floating panel windows: `Done`
-- Per-panel project, colors, font size, opacity, item limit: `Done`
+- Per-panel project, colors, font size, opacity, item limit, due-date visibility, and dock auto-hide timing: `Done`
 - Always-on-top control: `Done`
-- Minimized title-only mode: `Done`
+- Minimized title-only mode with double-click restore: `Done`
 - Edge-docked collapsed hover-expand mode: `Done`
 - Selected monitor placement and fallback restore: `Done`
 - Snap-to-grid settings scaffolding: `Partial`

@@ -430,7 +430,7 @@ function handlePanelFocusChange(panelId: string, focused: boolean) {
   }
 
   if (!runtime.hovered) {
-    schedulePanelExpandedState(panelId, false, 420);
+    schedulePanelExpandedState(panelId, false, panel.dockAutoHideDelayMs);
   }
 }
 
@@ -646,13 +646,13 @@ async function updatePanel(panel: PanelConfig) {
   if (nextPanel.projectId) {
     try {
       const tasks = await fetchTasksForPanel(getSettings(), nextPanel, getProjects());
-      setTaskCache(panel.id, tasks);
+      setTaskCache(nextPanel.id, tasks);
     } catch {
       // Keep the existing cache when a panel-specific refresh fails.
     }
   }
   invalidateState();
-  return panel;
+  return nextPanel;
 }
 
 async function deletePanel(panelId: string) {
@@ -701,7 +701,8 @@ async function handlePanelHover(panelId: string, hovered: boolean) {
   }
 
   if (!runtime.focused) {
-    schedulePanelExpandedState(panelId, false, 560);
+    // Per-panel auto-hide timing makes docked panels less twitchy across different desktop layouts.
+    schedulePanelExpandedState(panelId, false, panel.dockAutoHideDelayMs);
   }
 }
 

@@ -56,6 +56,8 @@ export interface GlobalDefaults {
   filterMode: PanelFilterMode;
   notificationMode: NotificationMode;
   notificationsEnabled: boolean;
+  showDueDates: boolean;
+  dockAutoHideDelayMs: number;
   alwaysOnTop: boolean;
   displayMode: PanelDisplayMode;
   dockEdge: DockEdge;
@@ -90,6 +92,8 @@ export interface PanelConfig {
   sortMode: PanelSortMode;
   filterMode: PanelFilterMode;
   notificationMode: NotificationMode;
+  showDueDates: boolean;
+  dockAutoHideDelayMs: number;
   alwaysOnTop: boolean;
   displayMode: PanelDisplayMode;
   dockEdge: DockEdge;

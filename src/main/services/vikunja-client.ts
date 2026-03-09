@@ -184,6 +184,8 @@ export async function testConnection(input: ConnectionTestInput) {
       filterMode: 'open',
       notificationMode: 'default',
       notificationsEnabled: false,
+      showDueDates: false,
+      dockAutoHideDelayMs: 900,
       alwaysOnTop: true,
       displayMode: 'full',
       dockEdge: 'right'

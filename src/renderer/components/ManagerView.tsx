@@ -278,6 +278,36 @@ export function ManagerView() {
                 onChange={(event) => setSettingsDraft({ ...settingsDraft, syncIntervalSeconds: Number(event.target.value) || 60 })}
               />
             </label>
+            <label className="toggle-row toggle-row--card">
+              <input
+                type="checkbox"
+                checked={settingsDraft.defaults.showDueDates}
+                onChange={(event) =>
+                  setSettingsDraft({
+                    ...settingsDraft,
+                    defaults: { ...settingsDraft.defaults, showDueDates: event.target.checked }
+                  })
+                }
+              />
+              <span>Show due dates in panels</span>
+            </label>
+            <label>
+              <span>Default dock auto-hide</span>
+              <input
+                type="range"
+                min={200}
+                max={5000}
+                step={100}
+                value={settingsDraft.defaults.dockAutoHideDelayMs}
+                onChange={(event) =>
+                  setSettingsDraft({
+                    ...settingsDraft,
+                    defaults: { ...settingsDraft.defaults, dockAutoHideDelayMs: Number(event.target.value) || 900 }
+                  })
+                }
+              />
+              <span className="muted">{(settingsDraft.defaults.dockAutoHideDelayMs / 1000).toFixed(1)}s</span>
+            </label>
           </div>
 
           <div className="inline-actions">
@@ -510,13 +540,14 @@ export function ManagerView() {
                     <label>
                       <span>Opacity</span>
                       <input
-                        type="number"
+                        type="range"
                         min={0.45}
                         max={1}
                         step={0.05}
                         value={activePanel.opacity}
                         onChange={(event) => setPanelDraft(activePanel.id, { ...activePanel, opacity: Number(event.target.value) || 0.97 })}
                       />
+                      <span className="muted">{Math.round(activePanel.opacity * 100)}%</span>
                     </label>
                   </div>
                 ) : null}
@@ -573,6 +604,31 @@ export function ManagerView() {
                         <option value="overdue">Overdue</option>
                         <option value="dueTodayAndOverdue">Due today + overdue</option>
                       </select>
+                    </label>
+                    <label className="toggle-row toggle-row--card">
+                      <input
+                        type="checkbox"
+                        checked={activePanel.showDueDates}
+                        onChange={(event) => setPanelDraft(activePanel.id, { ...activePanel, showDueDates: event.target.checked })}
+                      />
+                      <span>Show due dates</span>
+                    </label>
+                    <label>
+                      <span>Dock auto-hide</span>
+                      <input
+                        type="range"
+                        min={200}
+                        max={5000}
+                        step={100}
+                        value={activePanel.dockAutoHideDelayMs}
+                        onChange={(event) =>
+                          setPanelDraft(activePanel.id, {
+                            ...activePanel,
+                            dockAutoHideDelayMs: Number(event.target.value) || 900
+                          })
+                        }
+                      />
+                      <span className="muted">{(activePanel.dockAutoHideDelayMs / 1000).toFixed(1)}s</span>
                     </label>
                     <label className="toggle-row toggle-row--card">
                       <input

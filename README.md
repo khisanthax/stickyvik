@@ -11,7 +11,7 @@ Implemented in the current branch:
 - Tray controller with create panel, show/hide, sync, settings, pause always-on-top, and quit actions
 - Manager window with connection settings, allowed project selection, defaults, and persisted panel management
 - Secure credential storage via `keytar`
-- Multiple floating sticky panels with per-panel project selection, auto-mirrored project titles, subproject-aware task aggregation, style overrides, minimized mode, and edge-docked hover-expand behavior
+- Multiple floating sticky panels with per-panel project selection, auto-mirrored project titles, subproject-aware task aggregation, style overrides, minimized mode with double-click restore, and edge-docked hover-expand behavior with configurable auto-hide timing
 - Native lightweight task details windows for title, project move, notes, and completion actions
 - Runtime-stabilized dock hover handling, monitor-change reconciliation, and monitor-aware restore fallback
 - Vikunja API client layer for test connection, project fetch, task fetch, create task, complete task, rename task, move task, and details fetch
@@ -34,6 +34,9 @@ Implemented in the current branch:
 
 ## Configuration notes
 
+- Due dates are hidden in panel rows by default and can be enabled globally or per panel
+- Docked panels can use per-panel auto-hide timing and inline transparency controls from the panel menu
+
 - Vikunja server URL and non-secret app settings are stored locally in the app store
 - Credentials or tokens are stored with `keytar`
 - One Vikunja account/server is supported for MVP
@@ -50,7 +53,7 @@ Implemented in the current branch:
 5. Click `Test connection` and confirm the project count returns successfully
 6. Save settings, choose allowed projects, and create a panel
 7. Verify the panel loads tasks for the selected project
-8. Verify quick add, complete, rename, move, notification mode selection, and native details window behavior
+8. Verify quick add, complete, rename, move, notification mode selection, native details window behavior, and optional due-date visibility
 9. Switch a panel to `edge-docked` and confirm expand/collapse behavior on hover and focus
 10. Restart the app and confirm panels restore to the expected monitor and bounds
 

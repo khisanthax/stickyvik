@@ -249,12 +249,24 @@ label {
 }
 
 .sticky-header {
+  min-height: 54px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   padding-bottom: 8px;
+}
+
+.sticky-header__titles {
+  min-width: 0;
+}
+
+.sticky-header__titles--collapsed {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .menu-button {
@@ -264,6 +276,11 @@ label {
   padding: 0 14px;
   background: rgba(0, 0, 0, 0.15);
   color: inherit;
+}
+
+.eyebrow--docked {
+  margin: 0;
+  white-space: nowrap;
 }
 
 .panel-menu {
@@ -335,6 +352,10 @@ label {
   gap: 10px;
   color: rgba(27, 24, 17, 0.68);
   font-size: 0.78rem;
+}
+
+.panel-shell input[type="range"] {
+  width: 100%;
 }
 
 .task-title {
@@ -503,4 +524,36 @@ label {
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.04);
+}
+
+
+.panel-shell--collapsed {
+  justify-content: center;
+}
+
+.panel-shell--collapsed .sticky-header {
+  min-height: 100%;
+  border-bottom: 0;
+  padding-bottom: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.panel-shell--collapsed .minimized-note {
+  display: none;
+}
+
+.panel-shell--dock-left .eyebrow--docked {
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+
+.panel-shell--dock-right .eyebrow--docked {
+  transform: rotate(90deg);
+  transform-origin: center;
+}
+
+.panel-shell--dock-top .eyebrow--docked,
+.panel-shell--dock-bottom .eyebrow--docked {
+  transform: none;
 }

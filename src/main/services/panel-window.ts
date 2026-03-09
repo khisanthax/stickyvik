@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { BoundsState, PanelConfig, WindowContext } from '../../shared/types';
 
 const PANEL_MARGIN = 12;
-const TITLE_ONLY_HEIGHT = 52;
+const TITLE_ONLY_HEIGHT = 68;
 const EDGE_THICKNESS = 46;
 const MIN_WIDTH = 240;
 const MIN_HEIGHT = 180;

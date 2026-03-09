@@ -1,5 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, Notification, screen } from 'electron';
 
+import type { VikunjaProject } from '../shared/types';
+
 import type {
   AppSettings,
   DetailsBootstrap,
@@ -76,6 +78,39 @@ function getVisibleProjects() {
 
 function getDetailWindowKey(panelId: string, taskId: number) {
   return `${panelId}:${taskId}`;
+}
+
+function buildProjectLabel(projectId: number, projects: VikunjaProject[]) {
+  const lookup = new Map(projects.map((project) => [project.id, project]));
+  const segments: string[] = [];
+  let current = lookup.get(projectId) ?? null;
+
+  while (current) {
+    segments.unshift(current.title);
+    current = current.parentProjectId ? lookup.get(current.parentProjectId) ?? null : null;
+  }
+
+  return segments.join(' / ');
+}
+
+function syncPanelNameWithProject(panel: PanelConfig, projects = getProjects()) {
+  if (!panel.projectId) {
+    return panel;
+  }
+
+  const projectLabel = buildProjectLabel(panel.projectId, projects);
+  if (!projectLabel) {
+    return panel;
+  }
+
+  if (panel.name === projectLabel) {
+    return panel;
+  }
+
+  return {
+    ...panel,
+    name: projectLabel
+  };
 }
 
 function getPanelRuntime(panelId: string): PanelRuntimeState {
@@ -320,7 +355,10 @@ async function syncAll() {
     const projects = await fetchProjects(settings);
     setProjects(projects);
 
-    for (const panel of getPanels()) {
+    const syncedPanels = getPanels().map((panel) => syncPanelNameWithProject(panel, projects));
+    setPanels(syncedPanels);
+
+    for (const panel of syncedPanels) {
       if (!panel.projectId) {
         setTaskCache(panel.id, []);
         continue;
@@ -367,11 +405,13 @@ async function ensureManagerWindow() {
 }
 
 function persistPanel(panel: PanelConfig) {
+  const syncedPanel = syncPanelNameWithProject(panel);
   const panels = getPanels();
-  const nextPanels = panels.some((entry) => entry.id === panel.id)
-    ? panels.map((entry) => (entry.id === panel.id ? panel : entry))
-    : [...panels, panel];
+  const nextPanels = panels.some((entry) => entry.id === syncedPanel.id)
+    ? panels.map((entry) => (entry.id === syncedPanel.id ? syncedPanel : entry))
+    : [...panels, syncedPanel];
   setPanels(nextPanels);
+  return syncedPanel;
 }
 
 function handlePanelFocusChange(panelId: string, focused: boolean) {
@@ -558,8 +598,7 @@ async function togglePauseAlwaysOnTop() {
 }
 
 async function handleCreatePanel() {
-  const panel = makeDefaultPanel(getPanels().length + 1);
-  persistPanel(panel);
+  const panel = persistPanel(makeDefaultPanel(getPanels().length + 1));
   await createOrShowPanelWindow(panel);
   if (panel.projectId) {
     await syncAll();
@@ -592,17 +631,17 @@ async function saveSettingsAndSync(payload: { settings: AppSettings; secret?: st
 }
 
 async function updatePanel(panel: PanelConfig) {
-  persistPanel({
+  const nextPanel = persistPanel({
     ...panel,
     hoverExpanded: false
   });
-  const runtime = getPanelRuntime(panel.id);
+  const runtime = getPanelRuntime(nextPanel.id);
   runtime.expanded = false;
-  const window = await createOrShowPanelWindow(panel);
-  applyPanelWindowState(window, getEffectivePanel(panel), getSettings().pauseAlwaysOnTop);
-  if (panel.projectId) {
+  const window = await createOrShowPanelWindow(nextPanel);
+  applyPanelWindowState(window, getEffectivePanel(nextPanel), getSettings().pauseAlwaysOnTop);
+  if (nextPanel.projectId) {
     try {
-      const tasks = await fetchTasksForPanel(getSettings(), panel);
+      const tasks = await fetchTasksForPanel(getSettings(), nextPanel);
       setTaskCache(panel.id, tasks);
     } catch {
       // Keep the existing cache when a panel-specific refresh fails.

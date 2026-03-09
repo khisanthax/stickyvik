@@ -338,28 +338,25 @@ export function ManagerView() {
               <article key={panel.id} className="panel-admin-card">
                 <div className="field-grid field-grid--compact">
                   <label>
-                    <span>Name</span>
-                    <input
-                      type="text"
-                      value={draft.name}
-                      onChange={(event) =>
-                        setPanelDrafts((current) => ({
-                          ...current,
-                          [panel.id]: { ...draft, name: event.target.value }
-                        }))
-                      }
-                    />
+                    <span>Panel title</span>
+                    <input type="text" value={draft.name} readOnly title="Panel titles follow the selected project." />
                   </label>
                   <label>
                     <span>Project</span>
                     <select
                       value={draft.projectId ?? ''}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const projectId = event.target.value ? Number(event.target.value) : null;
+                        const nextProjectLabel = projectId ? projectLabels.get(projectId) ?? '' : draft.name;
                         setPanelDrafts((current) => ({
                           ...current,
-                          [panel.id]: { ...draft, projectId: event.target.value ? Number(event.target.value) : null }
-                        }))
-                      }
+                          [panel.id]: {
+                            ...draft,
+                            projectId,
+                            name: nextProjectLabel || draft.name
+                          }
+                        }));
+                      }}
                     >
                       <option value="">Choose project</option>
                       {manager.projects.map((project) => (

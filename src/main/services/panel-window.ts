@@ -1,4 +1,4 @@
-import { BrowserWindow, Tray, nativeImage, screen } from 'electron';
+import { app, BrowserWindow, Tray, nativeImage, screen } from 'electron';
 import path from 'node:path';
 
 import type { BoundsState, PanelConfig, WindowContext } from '../../shared/types';
@@ -8,6 +8,10 @@ const TITLE_ONLY_HEIGHT = 52;
 const EDGE_THICKNESS = 46;
 const MIN_WIDTH = 240;
 const MIN_HEIGHT = 180;
+
+function getAppIconPath() {
+  return path.join(app.getAppPath(), 'assets', 'tray-icon.png');
+}
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -121,6 +125,7 @@ export function createManagerWindow() {
     show: false,
     backgroundColor: '#13161b',
     autoHideMenuBar: true,
+    icon: getAppIconPath(),
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload.js'),
       contextIsolation: true,
@@ -142,6 +147,7 @@ export function createPanelWindow(panel: PanelConfig, pauseAlwaysOnTop: boolean)
     skipTaskbar: true,
     transparent: false,
     backgroundColor: '#101217',
+    icon: getAppIconPath(),
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload.js'),
       contextIsolation: true,
@@ -164,6 +170,7 @@ export function createDetailsWindow(parent?: BrowserWindow) {
     backgroundColor: '#13161b',
     title: 'Task Details',
     parent,
+    icon: getAppIconPath(),
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload.js'),
       contextIsolation: true,
@@ -214,6 +221,11 @@ export function capturePanelBounds(window: BrowserWindow, panel: PanelConfig): B
 }
 
 export function createTrayIcon() {
+  const fromPath = nativeImage.createFromPath(getAppIconPath());
+  if (!fromPath.isEmpty()) {
+    return fromPath.resize({ width: 16, height: 16 });
+  }
+
   return nativeImage.createFromDataURL(
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAQAAAC1+jfqAAAAj0lEQVR4AWNABP7///8mMDFhYWFxQ5EiiYuLi8MGRsY/cTAwMNiGoigKwv///zM0NDT+////BgaG/////2BjY8P4////TMQvxGGMHj16xMTAwPj//z8DA8P/PxgYGP7//59kZGRmBgaG/y9evMDAwPD///8ZRgaG/1euXGH4//8/AwNDH5qamtCMRsJqBiMmBv///8PAAAD6iR38koRa5QAAAABJRU5ErkJggg=='
   );

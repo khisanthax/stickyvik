@@ -89,8 +89,14 @@ export function PanelView() {
           <p className="eyebrow">{projectOptions.find((project) => project.id === panel.projectId)?.title ?? 'Choose project'}</p>
           <h1>{panel.name}</h1>
         </div>
-        <button className="menu-button" type="button" onClick={() => setMenuOpen((current) => !current)}>
-          •••
+        <button
+          className="menu-button"
+          type="button"
+          title="Open panel menu"
+          aria-label="Open panel menu"
+          onClick={() => setMenuOpen((current) => !current)}
+        >
+          Menu
         </button>
       </header>
 
@@ -100,12 +106,15 @@ export function PanelView() {
             <span>Project</span>
             <select
               value={panel.projectId ?? ''}
-              onChange={(event) =>
+              onChange={(event) => {
+                const projectId = event.target.value ? Number(event.target.value) : null;
+                const nextProject = projectOptions.find((project) => project.id === projectId);
                 void updatePanel({
                   ...panel,
-                  projectId: event.target.value ? Number(event.target.value) : null
-                })
-              }
+                  projectId,
+                  name: nextProject?.title ?? panel.name
+                });
+              }}
             >
               <option value="">Choose project</option>
               {projectOptions.map((project) => (

@@ -131,6 +131,7 @@ export async function testConnection(input: ConnectionTestInput) {
       itemCount: 10,
       sortMode: 'vikunja',
       filterMode: 'open',
+      notificationMode: 'default',
       notificationsEnabled: false,
       alwaysOnTop: true,
       displayMode: 'full',
@@ -328,3 +329,4 @@ function compareOptionalDate(left: string | null, right: string | null) {
   const rightValue = right ? new Date(right).getTime() : Number.MAX_SAFE_INTEGER;
   return leftValue - rightValue;
 }
+

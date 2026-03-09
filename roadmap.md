@@ -64,8 +64,8 @@ Windows-first Electron desktop companion for Vikunja with a tray controller, a m
 
 - Auto-sync and manual refresh: `Done`
 - Offline/auth error state with cached data: `Done`
-- Global notification settings: `Partial`
-- Per-panel notification override: `Missing`
+- Global notification settings: `Done`
+- Per-panel notification override: `Done`
 
 ### Phase 7: Windows behavior and polish
 
@@ -76,9 +76,9 @@ Windows-first Electron desktop companion for Vikunja with a tray controller, a m
 
 ## Remaining high-priority work
 
-1. Respect global and per-panel notification rules cleanly.
-2. Tighten restore behavior and monitor fallback logic.
-3. Make the Vikunja smoke-test path more explicit and verifiable.
+1. Tighten restore behavior and monitor fallback logic.
+2. Make the Vikunja smoke-test path more explicit and verifiable in normal development.
+3. Finish the remaining product-level polish on edge-docked hover behavior.
 
 ## Post-MVP / deferred
 

@@ -218,13 +218,41 @@ function applyLoginItemSettings(settings: AppSettings) {
   });
 }
 
-function dispatchNotifications() {
+function getPanelNotificationRules(panel: PanelConfig) {
   const settings = getSettings();
   if (!settings.notifications.enabled) {
-    return;
+    return { dueToday: false, overdue: false };
   }
 
+  if (panel.notificationMode === 'off') {
+    return { dueToday: false, overdue: false };
+  }
+
+  if (panel.notificationMode === 'dueToday') {
+    return { dueToday: true, overdue: false };
+  }
+
+  if (panel.notificationMode === 'overdue') {
+    return { dueToday: false, overdue: true };
+  }
+
+  if (panel.notificationMode === 'dueTodayAndOverdue') {
+    return { dueToday: true, overdue: true };
+  }
+
+  return {
+    dueToday: settings.notifications.dueToday,
+    overdue: settings.notifications.overdue
+  };
+}
+
+function dispatchNotifications() {
   for (const panel of getPanels()) {
+    const rules = getPanelNotificationRules(panel);
+    if (!rules.dueToday && !rules.overdue) {
+      continue;
+    }
+
     const tasks = getTaskCache(panel.id);
     for (const task of tasks) {
       if (!task.dueDate || task.done) {
@@ -234,9 +262,7 @@ function dispatchNotifications() {
       const due = new Date(task.dueDate);
       const isDueToday = due.toDateString() === new Date().toDateString();
       const isOverdue = due.getTime() < Date.now();
-      const shouldNotify =
-        (settings.notifications.dueToday && isDueToday) ||
-        (settings.notifications.overdue && isOverdue);
+      const shouldNotify = (rules.dueToday && isDueToday) || (rules.overdue && isOverdue);
       if (!shouldNotify) {
         continue;
       }
@@ -762,3 +788,4 @@ app.on('before-quit', () => {
 app.on('window-all-closed', () => {
   // The tray app stays resident even when all windows are closed.
 });
+

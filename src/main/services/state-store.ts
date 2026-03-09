@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     itemCount: 10,
     sortMode: 'vikunja',
     filterMode: 'open',
+    notificationMode: 'default',
     notificationsEnabled: false,
     alwaysOnTop: true,
     displayMode: 'full',
@@ -35,15 +36,53 @@ const DEFAULT_SYNC: SyncState = {
   lastError: null
 };
 
-interface PersistedState {
-  settings: AppSettings;
-  panels: PanelConfig[];
-  projects: VikunjaProject[];
-  taskCache: Record<string, VikunjaTask[]>;
-  sync: SyncState;
+let store: any = null;
+
+function normalizeSettings(settings: Partial<AppSettings> | undefined): AppSettings {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...settings,
+    notifications: {
+      ...DEFAULT_SETTINGS.notifications,
+      ...settings?.notifications
+    },
+    defaults: {
+      ...DEFAULT_SETTINGS.defaults,
+      ...settings?.defaults
+    }
+  };
 }
 
-let store: any = null;
+function normalizePanel(panel: Partial<PanelConfig>, index: number, settings: AppSettings): PanelConfig {
+  return {
+    id: panel.id ?? crypto.randomUUID(),
+    name: panel.name ?? `Panel ${index + 1}`,
+    projectId: panel.projectId ?? settings.allowedProjectIds[0] ?? null,
+    backgroundColor: panel.backgroundColor ?? settings.defaults.backgroundColor,
+    textColor: panel.textColor ?? settings.defaults.textColor,
+    fontSize: panel.fontSize ?? settings.defaults.fontSize,
+    opacity: panel.opacity ?? settings.defaults.opacity,
+    itemCount: panel.itemCount ?? settings.defaults.itemCount,
+    sortMode: panel.sortMode ?? settings.defaults.sortMode,
+    filterMode: panel.filterMode ?? settings.defaults.filterMode,
+    notificationMode: panel.notificationMode ?? settings.defaults.notificationMode,
+    alwaysOnTop: panel.alwaysOnTop ?? settings.defaults.alwaysOnTop,
+    displayMode: panel.displayMode ?? settings.defaults.displayMode,
+    dockEdge: panel.dockEdge ?? settings.defaults.dockEdge,
+    monitorMode: panel.monitorMode ?? 'primary',
+    displayId: panel.displayId,
+    snapToGrid: panel.snapToGrid ?? false,
+    gridSize: panel.gridSize ?? 24,
+    bounds: {
+      x: panel.bounds?.x ?? 40 + index * 24,
+      y: panel.bounds?.y ?? 40 + index * 24,
+      width: panel.bounds?.width ?? 320,
+      height: panel.bounds?.height ?? 440,
+      displayId: panel.bounds?.displayId ?? panel.displayId
+    },
+    hoverExpanded: false
+  };
+}
 
 export async function initStateStore(): Promise<void> {
   if (store) {
@@ -72,19 +111,22 @@ function requireStore(): any {
 }
 
 export function getSettings(): AppSettings {
-  return requireStore().get('settings') as AppSettings;
+  return normalizeSettings(requireStore().get('settings') as Partial<AppSettings>);
 }
 
 export function setSettings(settings: AppSettings): void {
-  requireStore().set('settings', settings);
+  requireStore().set('settings', normalizeSettings(settings));
 }
 
 export function getPanels(): PanelConfig[] {
-  return requireStore().get('panels') as PanelConfig[];
+  const settings = getSettings();
+  const panels = (requireStore().get('panels') as Partial<PanelConfig>[]) ?? [];
+  return panels.map((panel, index) => normalizePanel(panel, index, settings));
 }
 
 export function setPanels(panels: PanelConfig[]): void {
-  requireStore().set('panels', panels);
+  const settings = getSettings();
+  requireStore().set('panels', panels.map((panel, index) => normalizePanel(panel, index, settings)));
 }
 
 export function getProjects(): VikunjaProject[] {
@@ -123,30 +165,5 @@ export function setSyncState(sync: SyncState): void {
 }
 
 export function makeDefaultPanel(index: number): PanelConfig {
-  const settings = getSettings();
-  return {
-    id: crypto.randomUUID(),
-    name: `Panel ${index}`,
-    projectId: settings.allowedProjectIds[0] ?? null,
-    backgroundColor: settings.defaults.backgroundColor,
-    textColor: settings.defaults.textColor,
-    fontSize: settings.defaults.fontSize,
-    opacity: settings.defaults.opacity,
-    itemCount: settings.defaults.itemCount,
-    sortMode: settings.defaults.sortMode,
-    filterMode: settings.defaults.filterMode,
-    alwaysOnTop: settings.defaults.alwaysOnTop,
-    displayMode: settings.defaults.displayMode,
-    dockEdge: settings.defaults.dockEdge,
-    monitorMode: 'primary',
-    snapToGrid: false,
-    gridSize: 24,
-    bounds: {
-      x: 40 + index * 24,
-      y: 40 + index * 24,
-      width: 320,
-      height: 440
-    },
-    hoverExpanded: false
-  };
+  return normalizePanel({}, index, getSettings());
 }

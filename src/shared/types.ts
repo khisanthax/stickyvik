@@ -3,6 +3,7 @@ export type PanelSortMode = 'vikunja' | 'dueDate' | 'priority' | 'newest' | 'old
 export type PanelFilterMode = 'open' | 'dueToday' | 'overdue' | 'dueEmphasis';
 export type PanelDisplayMode = 'full' | 'minimized' | 'edge-docked';
 export type DockEdge = 'left' | 'right' | 'top' | 'bottom';
+export type NotificationMode = 'default' | 'off' | 'dueToday' | 'overdue' | 'dueTodayAndOverdue';
 export type WindowView = 'manager' | 'panel' | 'details';
 
 export interface WindowContext {
@@ -53,6 +54,7 @@ export interface GlobalDefaults {
   itemCount: number;
   sortMode: PanelSortMode;
   filterMode: PanelFilterMode;
+  notificationMode: NotificationMode;
   notificationsEnabled: boolean;
   alwaysOnTop: boolean;
   displayMode: PanelDisplayMode;
@@ -87,6 +89,7 @@ export interface PanelConfig {
   itemCount: number;
   sortMode: PanelSortMode;
   filterMode: PanelFilterMode;
+  notificationMode: NotificationMode;
   alwaysOnTop: boolean;
   displayMode: PanelDisplayMode;
   dockEdge: DockEdge;

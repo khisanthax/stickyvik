@@ -16,7 +16,7 @@ Implemented in the current branch:
 - Runtime-stabilized dock hover handling and monitor-change window reconciliation
 - Vikunja API client layer for test connection, project fetch, task fetch, create task, complete task, rename task, move task, and details fetch
 - Restore of saved panels and their monitor/bounds data on startup
-- Basic due-today and overdue desktop notifications
+- Global notification defaults plus per-panel notification overrides for due-today and overdue reminders
 
 ## Development
 
@@ -39,14 +39,28 @@ Implemented in the current branch:
 - One Vikunja account/server is supported for MVP
 - The app targets Windows behavior first, including tray persistence and `openAtLogin`
 
+## Smoke test checklist
+
+1. Run `npm install`
+2. Run `npm run postinstall`
+3. Run `npm run dev`
+4. In the manager window, enter your Vikunja URL and token or username/password
+5. Click `Test connection` and confirm the project count returns successfully
+6. Save settings, choose allowed projects, and create a panel
+7. Verify the panel loads tasks for the selected project
+8. Verify quick add, complete, rename, move, and native details window behavior
+9. Switch a panel to `edge-docked` and confirm expand/collapse behavior on hover and focus
+10. Restart the app and confirm panels restore to the expected monitor and bounds
+
 ## Known limitations
 
 - The Vikunja API layer is implemented against the common `/api/v1` endpoints and may need endpoint adjustments for older server versions
 - Edge-docked hover-expand is improved, but still needs more product-level polish for every focus/monitor edge case
-- Notification rules currently cover basic due-today and overdue desktop notifications only
+- Monitor fallback and restoration are better, but still not fully battle-tested across more complex monitor changes
+- A real live Vikunja smoke test still depends on developer-provided credentials and a reachable server
 
 ## TODO after MVP
 
-- Per-panel desktop notifications and due-today / overdue reminders
 - Mirrored panels across all monitors
 - Snap-to-grid placement controls in the panel manager
+- Richer notification rules and snooze behavior

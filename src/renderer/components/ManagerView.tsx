@@ -247,7 +247,36 @@ export function ManagerView() {
                   })
                 }
               />
-              <span>Enable notification scaffold</span>
+              <span>Enable notifications</span>
+            </label>
+          </div>
+
+          <div className="inline-actions">
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={settingsDraft.notifications.dueToday}
+                onChange={(event) =>
+                  setSettingsDraft({
+                    ...settingsDraft,
+                    notifications: { ...settingsDraft.notifications, dueToday: event.target.checked }
+                  })
+                }
+              />
+              <span>Notify due today</span>
+            </label>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={settingsDraft.notifications.overdue}
+                onChange={(event) =>
+                  setSettingsDraft({
+                    ...settingsDraft,
+                    notifications: { ...settingsDraft.notifications, overdue: event.target.checked }
+                  })
+                }
+              />
+              <span>Notify overdue</span>
             </label>
           </div>
 
@@ -269,7 +298,7 @@ export function ManagerView() {
         <div className="section-header">
           <div>
             <h2>Panels</h2>
-            <p className="muted">Each sticky panel can target its own project and visual style.</p>
+            <p className="muted">Each sticky panel can target its own project, visual style, and notification behavior.</p>
           </div>
           <button type="button" onClick={() => void createPanel()}>
             Create panel
@@ -382,6 +411,24 @@ export function ManagerView() {
                       <option value="right">Right</option>
                       <option value="top">Top</option>
                       <option value="bottom">Bottom</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Notify</span>
+                    <select
+                      value={draft.notificationMode}
+                      onChange={(event) =>
+                        setPanelDrafts((current) => ({
+                          ...current,
+                          [panel.id]: { ...draft, notificationMode: event.target.value as PanelConfig['notificationMode'] }
+                        }))
+                      }
+                    >
+                      <option value="default">Use global defaults</option>
+                      <option value="off">Off</option>
+                      <option value="dueToday">Due today</option>
+                      <option value="overdue">Overdue</option>
+                      <option value="dueTodayAndOverdue">Due today + overdue</option>
                     </select>
                   </label>
                   <label>

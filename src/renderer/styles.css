@@ -290,6 +290,11 @@ label {
   margin: 0;
   white-space: nowrap;
   max-width: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.eyebrow--hidden {
+  opacity: 0;
 }
 
 .panel-menu {
@@ -577,9 +582,17 @@ label {
   transform-origin: top center;
 }
 
+.panel-shell--dock-left .eyebrow--hidden {
+  transform: translateX(-50%) rotate(-90deg) translateY(-10px);
+}
+
 .panel-shell--dock-right .eyebrow--docked {
   transform: translateX(-50%) rotate(90deg);
   transform-origin: top center;
+}
+
+.panel-shell--dock-right .eyebrow--hidden {
+  transform: translateX(-50%) rotate(90deg) translateY(-10px);
 }
 
 .panel-shell--dock-top .sticky-header__titles--collapsed,

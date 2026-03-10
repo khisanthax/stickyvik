@@ -112,6 +112,7 @@ export function PanelView() {
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [collapsedLabelVisible, setCollapsedLabelVisible] = useState(true);
   const clickTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -137,6 +138,7 @@ export function PanelView() {
   const isCollapsedDock = panel.displayMode === 'edge-docked' && !panel.hoverExpanded;
   const showDates = panel.showDueDates;
   const resolvedTextColor = resolvePanelTextColor(panel.backgroundColor, panel.textColor);
+  const shouldFadeCollapsedLabel = isCollapsedDock && (panel.dockEdge === 'left' || panel.dockEdge === 'right');
   const textStyle = {
     background: panel.backgroundColor,
     color: resolvedTextColor,
@@ -146,6 +148,22 @@ export function PanelView() {
     '--panel-border-color': rgbaFromHex(resolvedTextColor, 0.18),
     '--panel-button-fill': getPanelButtonFill(panel.backgroundColor)
   } as CSSProperties;
+
+  useEffect(() => {
+    if (!shouldFadeCollapsedLabel) {
+      setCollapsedLabelVisible(true);
+      return;
+    }
+
+    setCollapsedLabelVisible(true);
+    const timer = window.setTimeout(() => {
+      setCollapsedLabelVisible(false);
+    }, 2400);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [shouldFadeCollapsedLabel, panel.id, projectLabel]);
 
   function handleTaskClick(task: VikunjaTask) {
     clickTimer.current = window.setTimeout(() => {
@@ -196,7 +214,7 @@ export function PanelView() {
             }
           }}
         >
-          <p className={`eyebrow ${isCollapsedDock ? 'eyebrow--docked' : ''}`}>{projectLabel}</p>
+          <p className={`eyebrow ${isCollapsedDock ? 'eyebrow--docked' : ''} ${shouldFadeCollapsedLabel && !collapsedLabelVisible ? 'eyebrow--hidden' : ''}`}>{projectLabel}</p>
           {!isCollapsedDock ? <h1>{panel.name}</h1> : null}
         </div>
         {!isCollapsedDock ? (

@@ -43,8 +43,22 @@ export function ManagerView() {
       return;
     }
 
-    setSettingsDraft(manager.settings);
-    setPanelDrafts(Object.fromEntries(manager.panels.map((panel) => [panel.id, panel])));
+    // Only hydrate once: a background sync tick fires this effect on every
+    // `manager` refresh, and re-adopting manager.settings here would wipe out
+    // any unsaved edit (e.g. mid-click in the project checklist) the moment a
+    // sync lands. Saving already keeps the draft in sync with what's on disk.
+    setSettingsDraft((current) => current ?? manager.settings);
+    // Same reasoning as settingsDraft above: keep an in-progress edit to a
+    // panel's own draft instead of overwriting it on every manager refresh.
+    // New panels (created elsewhere, e.g. from the tray menu) still get
+    // picked up, and deleted panels still drop out.
+    setPanelDrafts((current) => {
+      const next: Record<string, PanelConfig> = {};
+      for (const panel of manager.panels) {
+        next[panel.id] = current[panel.id] ?? panel;
+      }
+      return next;
+    });
     const createdNewPanel = manager.panels.length > previousPanelCount.current;
     previousPanelCount.current = manager.panels.length;
     setActivePanelId((current) => {

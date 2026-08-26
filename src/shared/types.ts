@@ -1,7 +1,7 @@
 export type AuthMethod = 'token' | 'password';
 export type PanelSortMode = 'vikunja' | 'dueDate' | 'priority' | 'newest' | 'oldest' | 'alphabetical' | 'overdueFirst';
 export type PanelFilterMode = 'open' | 'dueToday' | 'overdue' | 'dueEmphasis';
-export type PanelDisplayMode = 'full' | 'minimized' | 'edge-docked';
+export type PanelDisplayMode = 'full' | 'minimized' | 'edge-docked' | 'kanban';
 export type DockEdge = 'left' | 'right' | 'top' | 'bottom';
 export type NotificationMode = 'default' | 'off' | 'dueToday' | 'overdue' | 'dueTodayAndOverdue';
 export type WindowView = 'manager' | 'panel' | 'details';
@@ -30,6 +30,19 @@ export interface VikunjaTask {
   createdAt: string | null;
   updatedAt: string | null;
   position: number | null;
+}
+
+export interface VikunjaBucket {
+  id: number;
+  title: string;
+  position: number;
+  limit: number;
+  tasks: VikunjaTask[];
+}
+
+export interface KanbanBoard {
+  viewId: number;
+  buckets: VikunjaBucket[];
 }
 
 export interface SyncState {
@@ -136,6 +149,9 @@ export interface PanelBootstrap {
   settings: AppSettings;
   projects: VikunjaProject[];
   tasks: VikunjaTask[];
+  // Populated when panel.displayMode is 'kanban' and the panel's project has a
+  // kanban view. Null otherwise (no project chosen, or the project has none).
+  board: KanbanBoard | null;
   sync: SyncState;
 }
 
@@ -175,6 +191,8 @@ export interface StickyVikBridge {
   toggleTaskDone: (panelId: string, taskId: number, done: boolean) => Promise<void>;
   renameTask: (panelId: string, taskId: number, title: string) => Promise<void>;
   moveTask: (panelId: string, taskId: number, projectId: number) => Promise<void>;
+  moveTaskToBucket: (panelId: string, taskId: number, bucketId: number) => Promise<void>;
+  reorderTaskInBucket: (panelId: string, taskId: number, bucketId: number, beforeTaskId: number | null, afterTaskId: number | null) => Promise<void>;
   getTaskDetails: (taskId: number) => Promise<VikunjaTask>;
   onStateInvalidated: (listener: () => void) => () => void;
 }

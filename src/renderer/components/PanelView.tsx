@@ -1,7 +1,15 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
 
-import type { PanelConfig, VikunjaProject, VikunjaTask } from '../../shared/types';
+import type { PanelConfig, VikunjaBucket, VikunjaProject, VikunjaTask } from '../../shared/types';
 import { useAppStore } from '../store/useAppStore';
+
+// Where a drag would land if dropped right now: which bucket, and the index
+// within that bucket's task list (with the dragged task itself excluded, so
+// index N always means "N tasks already ahead of it") it would be inserted at.
+interface DropTarget {
+  bucketId: number;
+  index: number;
+}
 
 function formatDue(dateValue: string | null) {
   if (!dateValue) {
@@ -107,12 +115,16 @@ export function PanelView() {
   const openTaskDetails = useAppStore((state) => state.openTaskDetails);
   const syncNow = useAppStore((state) => state.syncNow);
   const showManager = useAppStore((state) => state.showManager);
+  const moveTaskToBucket = useAppStore((state) => state.moveTaskToBucket);
+  const reorderTaskInBucket = useAppStore((state) => state.reorderTaskInBucket);
 
   const [taskDraft, setTaskDraft] = useState('');
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsedLabelVisible, setCollapsedLabelVisible] = useState(true);
+  const [dragTaskId, setDragTaskId] = useState<number | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const clickTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -197,6 +209,73 @@ export function PanelView() {
     });
   }
 
+  function tasksExcludingDrag(bucket: VikunjaBucket) {
+    return dragTaskId === null ? bucket.tasks : bucket.tasks.filter((task) => task.id !== dragTaskId);
+  }
+
+  function handleCardDragStart(taskId: number) {
+    setDragTaskId(taskId);
+  }
+
+  function handleCardDragEnd() {
+    setDragTaskId(null);
+    setDropTarget(null);
+  }
+
+  function handleTaskRowDragOver(event: DragEvent<HTMLElement>, bucket: VikunjaBucket, hoverTask: VikunjaTask) {
+    event.preventDefault();
+    if (dragTaskId === null) {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const isTopHalf = event.clientY < rect.top + rect.height / 2;
+    const filtered = tasksExcludingDrag(bucket);
+    const hoverIndex = filtered.findIndex((task) => task.id === hoverTask.id);
+    const index = hoverIndex === -1 ? filtered.length : isTopHalf ? hoverIndex : hoverIndex + 1;
+    setDropTarget((current) => (current?.bucketId === bucket.id && current.index === index ? current : { bucketId: bucket.id, index }));
+  }
+
+  function handleColumnDragOver(event: DragEvent<HTMLElement>, bucket: VikunjaBucket) {
+    event.preventDefault();
+    if (dragTaskId === null) {
+      return;
+    }
+
+    // Hovering the column body outside any specific card row always means
+    // "append at the end" - the per-row handler above wins when it fires.
+    const index = tasksExcludingDrag(bucket).length;
+    setDropTarget((current) => (current?.bucketId === bucket.id && current.index === index ? current : { bucketId: bucket.id, index }));
+  }
+
+  function handleColumnDrop(event: DragEvent<HTMLElement>, bucket: VikunjaBucket) {
+    event.preventDefault();
+    const board = panelBootstrap?.board;
+    const taskId = dragTaskId;
+    const target = dropTarget;
+    setDragTaskId(null);
+    setDropTarget(null);
+    if (!board || taskId === null || !target || target.bucketId !== bucket.id) {
+      return;
+    }
+
+    const originBucket = board.buckets.find((entry) => entry.tasks.some((task) => task.id === taskId));
+    const filtered = tasksExcludingDrag(bucket);
+    const beforeTask = target.index > 0 ? filtered[target.index - 1] : null;
+    const afterTask = target.index < filtered.length ? filtered[target.index] : null;
+
+    if (originBucket?.id === bucket.id) {
+      void reorderTaskInBucket(panel.id, taskId, bucket.id, beforeTask?.id ?? null, afterTask?.id ?? null);
+      return;
+    }
+
+    void moveTaskToBucket(panel.id, taskId, bucket.id).then(() => {
+      if (beforeTask || afterTask) {
+        void reorderTaskInBucket(panel.id, taskId, bucket.id, beforeTask?.id ?? null, afterTask?.id ?? null);
+      }
+    });
+  }
+
   return (
     <div
       className={`panel-shell panel-shell--${panel.displayMode} ${isCollapsedDock ? `panel-shell--collapsed panel-shell--dock-${panel.dockEdge}` : ''}`}
@@ -266,6 +345,7 @@ export function PanelView() {
               <option value="full">Full</option>
               <option value="minimized">Minimized</option>
               <option value="edge-docked">Edge-docked</option>
+              <option value="kanban">Kanban board</option>
             </select>
           </label>
           <label>
@@ -352,60 +432,156 @@ export function PanelView() {
             </button>
           </section>
 
-          <section className="task-list">
-            {panelBootstrap.tasks.length === 0 ? (
-              <p className="empty-state">
-                No matching tasks in {panel.projectId ? projectLabel : 'this panel'}.
-              </p>
-            ) : null}
-            {panelBootstrap.tasks.map((task) => (
-              <article key={task.id} className={`task-row ${task.done ? 'task-row--done' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={task.done}
-                  onChange={(event) => void toggleTaskDone(panel.id, task.id, event.target.checked)}
-                />
-                <div className="task-row__body">
-                  {editingTaskId === task.id ? (
-                    <input
-                      autoFocus
-                      type="text"
-                      value={editingTitle}
-                      onChange={(event) => setEditingTitle(event.target.value)}
-                      onBlur={() => {
-                        if (editingTitle.trim()) {
-                          void renameTask(panel.id, task.id, editingTitle.trim());
-                        }
-                        setEditingTaskId(null);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          void renameTask(panel.id, task.id, editingTitle.trim());
-                          setEditingTaskId(null);
-                        }
-                        if (event.key === 'Escape') {
-                          setEditingTaskId(null);
-                        }
-                      }}
-                    />
-                  ) : (
-                    <button
-                      className="task-title"
-                      type="button"
-                      onClick={() => handleTaskClick(task)}
-                      onDoubleClick={() => handleTaskDoubleClick(task)}
+          {panel.displayMode === 'kanban' ? (
+            panelBootstrap.board ? (
+              <section className="kanban-board">
+                {panelBootstrap.board.buckets.map((bucket) => {
+                  const filtered = tasksExcludingDrag(bucket);
+                  return (
+                    <div
+                      key={bucket.id}
+                      className="kanban-column"
+                      onDragOver={(event) => handleColumnDragOver(event, bucket)}
+                      onDrop={(event) => handleColumnDrop(event, bucket)}
                     >
-                      {task.title}
-                    </button>
-                  )}
-                  <div className="task-row__meta">
-                    {task.priority ? <span>P{task.priority}</span> : null}
-                    {showDates && task.dueDate ? <span>{formatDue(task.dueDate)}</span> : null}
+                      <div className="kanban-column__header">
+                        <span>{bucket.title}</span>
+                        <span className="kanban-column__count muted">
+                          {bucket.tasks.length}
+                          {bucket.limit ? ` / ${bucket.limit}` : ''}
+                        </span>
+                      </div>
+                      <div className="kanban-column__tasks">
+                        {filtered.length === 0 && dropTarget?.bucketId !== bucket.id ? (
+                          <p className="empty-state kanban-column__empty">No tasks</p>
+                        ) : null}
+                        {filtered.map((task, index) => (
+                          <div key={task.id}>
+                            {dropTarget?.bucketId === bucket.id && dropTarget.index === index ? (
+                              <div className="kanban-drop-indicator" />
+                            ) : null}
+                            <article
+                              className={`kanban-card ${task.done ? 'kanban-card--done' : ''} ${dragTaskId === task.id ? 'kanban-card--dragging' : ''}`}
+                              draggable
+                              onDragStart={() => handleCardDragStart(task.id)}
+                              onDragEnd={handleCardDragEnd}
+                              onDragOver={(event) => handleTaskRowDragOver(event, bucket, task)}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={task.done}
+                                onChange={(event) => void toggleTaskDone(panel.id, task.id, event.target.checked)}
+                              />
+                              <div className="task-row__body">
+                                {editingTaskId === task.id ? (
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={editingTitle}
+                                    onChange={(event) => setEditingTitle(event.target.value)}
+                                    onBlur={() => {
+                                      if (editingTitle.trim()) {
+                                        void renameTask(panel.id, task.id, editingTitle.trim());
+                                      }
+                                      setEditingTaskId(null);
+                                    }}
+                                    onKeyDown={(event) => {
+                                      if (event.key === 'Enter') {
+                                        void renameTask(panel.id, task.id, editingTitle.trim());
+                                        setEditingTaskId(null);
+                                      }
+                                      if (event.key === 'Escape') {
+                                        setEditingTaskId(null);
+                                      }
+                                    }}
+                                  />
+                                ) : (
+                                  <button
+                                    className="task-title"
+                                    type="button"
+                                    onClick={() => handleTaskClick(task)}
+                                    onDoubleClick={() => handleTaskDoubleClick(task)}
+                                  >
+                                    {task.title}
+                                  </button>
+                                )}
+                                <div className="task-row__meta">
+                                  {task.priority ? <span>P{task.priority}</span> : null}
+                                  {showDates && task.dueDate ? <span>{formatDue(task.dueDate)}</span> : null}
+                                </div>
+                              </div>
+                            </article>
+                          </div>
+                        ))}
+                        {dropTarget?.bucketId === bucket.id && dropTarget.index === filtered.length ? (
+                          <div className="kanban-drop-indicator" />
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </section>
+            ) : (
+              <p className="empty-state">
+                {panel.projectId ? "This project doesn't have a kanban view in Vikunja." : 'Choose a project to see its board.'}
+              </p>
+            )
+          ) : (
+            <section className="task-list">
+              {panelBootstrap.tasks.length === 0 ? (
+                <p className="empty-state">
+                  No matching tasks in {panel.projectId ? projectLabel : 'this panel'}.
+                </p>
+              ) : null}
+              {panelBootstrap.tasks.map((task) => (
+                <article key={task.id} className={`task-row ${task.done ? 'task-row--done' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={task.done}
+                    onChange={(event) => void toggleTaskDone(panel.id, task.id, event.target.checked)}
+                  />
+                  <div className="task-row__body">
+                    {editingTaskId === task.id ? (
+                      <input
+                        autoFocus
+                        type="text"
+                        value={editingTitle}
+                        onChange={(event) => setEditingTitle(event.target.value)}
+                        onBlur={() => {
+                          if (editingTitle.trim()) {
+                            void renameTask(panel.id, task.id, editingTitle.trim());
+                          }
+                          setEditingTaskId(null);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            void renameTask(panel.id, task.id, editingTitle.trim());
+                            setEditingTaskId(null);
+                          }
+                          if (event.key === 'Escape') {
+                            setEditingTaskId(null);
+                          }
+                        }}
+                      />
+                    ) : (
+                      <button
+                        className="task-title"
+                        type="button"
+                        onClick={() => handleTaskClick(task)}
+                        onDoubleClick={() => handleTaskDoubleClick(task)}
+                      >
+                        {task.title}
+                      </button>
+                    )}
+                    <div className="task-row__meta">
+                      {task.priority ? <span>P{task.priority}</span> : null}
+                      {showDates && task.dueDate ? <span>{formatDue(task.dueDate)}</span> : null}
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
-          </section>
+                </article>
+              ))}
+            </section>
+          )}
         </>
       ) : (
         <section className="minimized-note">

@@ -5,6 +5,7 @@ import type { VikunjaProject } from '../shared/types';
 import type {
   AppSettings,
   DetailsBootstrap,
+  KanbanBoard,
   ManagerBootstrap,
   PanelBootstrap,
   PanelConfig,
@@ -23,6 +24,7 @@ import {
   makeTray
 } from './services/panel-window';
 import {
+  getBoardCache,
   getPanels,
   getProjects,
   getSettings,
@@ -30,7 +32,9 @@ import {
   getTaskCache,
   initStateStore,
   makeDefaultPanel,
+  removeBoardCache,
   removeTaskCache,
+  setBoardCache,
   setPanels,
   setProjects,
   setSettings,
@@ -39,11 +43,14 @@ import {
 } from './services/state-store';
 import {
   createTask,
+  fetchKanbanBoard,
   fetchProjects,
   fetchTasksForPanel,
   getTaskDetails,
   moveTask,
+  moveTaskToBucket,
   renameTask,
+  reorderTaskInBucket,
   setTaskDone,
   testConnection
 } from './services/vikunja-client';
@@ -74,6 +81,33 @@ function getVisibleProjects() {
   }
 
   return projects.filter((project) => settings.allowedProjectIds.includes(project.id));
+}
+
+// Optimistic client-side move so a drag-and-drop drop renders instantly,
+// ahead of the network round trip. refreshPanelBoard() overwrites this with
+// the server's authoritative bucket/position right after.
+function moveTaskBetweenBucketsInCache(board: KanbanBoard, taskId: number, targetBucketId: number): KanbanBoard {
+  let movedTask: VikunjaTask | undefined;
+  const withoutTask = board.buckets.map((bucket) => {
+    const task = bucket.tasks.find((entry) => entry.id === taskId);
+    if (!task) {
+      return bucket;
+    }
+
+    movedTask = task;
+    return { ...bucket, tasks: bucket.tasks.filter((entry) => entry.id !== taskId) };
+  });
+
+  if (!movedTask) {
+    return board;
+  }
+
+  return {
+    ...board,
+    buckets: withoutTask.map((bucket) =>
+      bucket.id === targetBucketId ? { ...bucket, tasks: [...bucket.tasks, movedTask as VikunjaTask] } : bucket
+    )
+  };
 }
 
 function getDetailWindowKey(panelId: string, taskId: number) {
@@ -200,6 +234,7 @@ async function buildPanelBootstrap(panelId: string): Promise<PanelBootstrap> {
     settings: getSettings(),
     projects: getVisibleProjects(),
     tasks: getTaskCache(panelId),
+    board: getBoardCache(panelId),
     sync: getSyncState()
   };
 }
@@ -361,11 +396,20 @@ async function syncAll() {
     for (const panel of syncedPanels) {
       if (!panel.projectId) {
         setTaskCache(panel.id, []);
+        setBoardCache(panel.id, null);
         continue;
       }
 
       const tasks = await fetchTasksForPanel(settings, panel, projects);
       setTaskCache(panel.id, tasks);
+
+      if (panel.displayMode === 'kanban') {
+        try {
+          setBoardCache(panel.id, await fetchKanbanBoard(settings, panel.projectId));
+        } catch {
+          // Keep the existing cached board when this project's board fetch fails.
+        }
+      }
     }
 
     dispatchNotifications();
@@ -504,6 +548,7 @@ async function createOrShowPanelWindow(panel: PanelConfig) {
     if (!isQuitting && !suppressPanelDeletion) {
       setPanels(getPanels().filter((entry) => entry.id !== panel.id));
       removeTaskCache(panel.id);
+      removeBoardCache(panel.id);
       for (const [key, detailsWindow] of detailsWindows.entries()) {
         if (key.startsWith(`${panel.id}:`) && !detailsWindow.isDestroyed()) {
           detailsWindow.close();
@@ -650,6 +695,14 @@ async function updatePanel(panel: PanelConfig) {
     } catch {
       // Keep the existing cache when a panel-specific refresh fails.
     }
+
+    if (nextPanel.displayMode === 'kanban') {
+      await refreshPanelBoard(nextPanel.id);
+    } else {
+      setBoardCache(nextPanel.id, null);
+    }
+  } else {
+    setBoardCache(nextPanel.id, null);
   }
   invalidateState();
   return nextPanel;
@@ -664,6 +717,7 @@ async function deletePanel(panelId: string) {
   suppressPanelDeletion = false;
   setPanels(getPanels().filter((panel) => panel.id !== panelId));
   removeTaskCache(panelId);
+  removeBoardCache(panelId);
   for (const [key, detailsWindow] of detailsWindows.entries()) {
     if (key.startsWith(`${panelId}:`) && !detailsWindow.isDestroyed()) {
       detailsWindow.close();
@@ -681,6 +735,25 @@ async function refreshSinglePanel(panelId: string) {
 
   const tasks = await fetchTasksForPanel(getSettings(), panel, getProjects());
   setTaskCache(panelId, tasks);
+
+  if (panel.displayMode === 'kanban') {
+    await refreshPanelBoard(panelId);
+  }
+}
+
+async function refreshPanelBoard(panelId: string) {
+  const panel = getPanels().find((entry) => entry.id === panelId);
+  if (!panel || !panel.projectId) {
+    setBoardCache(panelId, null);
+    return;
+  }
+
+  try {
+    const board = await fetchKanbanBoard(getSettings(), panel.projectId);
+    setBoardCache(panelId, board);
+  } catch {
+    // Keep the existing cached board when a refresh fails (e.g. offline).
+  }
 }
 
 async function handlePanelHover(panelId: string, hovered: boolean) {
@@ -760,7 +833,9 @@ async function bootstrap() {
   });
   ipcMain.handle('manager:get-bootstrap', async () => buildManagerBootstrap());
   ipcMain.handle('panel:get-bootstrap', async (_event, panelId: string) => {
-    if (getTaskCache(panelId).length === 0) {
+    const panel = getPanels().find((entry) => entry.id === panelId);
+    const needsBoard = panel?.displayMode === 'kanban' && getBoardCache(panelId) === null;
+    if (getTaskCache(panelId).length === 0 || needsBoard) {
       try {
         await refreshSinglePanel(panelId);
       } catch {
@@ -867,6 +942,45 @@ async function bootstrap() {
     await refreshSinglePanel(panelId);
     invalidateState();
   });
+  ipcMain.handle('task:move-bucket', async (_event, panelId: string, taskId: number, bucketId: number) => {
+    const panel = getPanels().find((entry) => entry.id === panelId);
+    const board = getBoardCache(panelId);
+    if (!panel?.projectId || !board) {
+      throw new Error('This panel has no kanban board loaded yet');
+    }
+
+    // Optimistic move so the drop feels instant; refreshPanelBoard reconciles
+    // with the server's own ordering right after.
+    setBoardCache(panelId, moveTaskBetweenBucketsInCache(board, taskId, bucketId));
+    invalidateState();
+
+    try {
+      await moveTaskToBucket(getSettings(), panel.projectId, board.viewId, bucketId, taskId);
+    } finally {
+      await refreshPanelBoard(panelId);
+      invalidateState();
+    }
+  });
+  ipcMain.handle(
+    'task:reorder',
+    async (_event, panelId: string, taskId: number, bucketId: number, beforeTaskId: number | null, afterTaskId: number | null) => {
+      const board = getBoardCache(panelId);
+      if (!board) {
+        throw new Error('This panel has no kanban board loaded yet');
+      }
+
+      const bucket = board.buckets.find((entry) => entry.id === bucketId);
+      const beforeTask = beforeTaskId !== null ? bucket?.tasks.find((entry) => entry.id === beforeTaskId) : undefined;
+      const afterTask = afterTaskId !== null ? bucket?.tasks.find((entry) => entry.id === afterTaskId) : undefined;
+
+      try {
+        await reorderTaskInBucket(getSettings(), board.viewId, taskId, beforeTask?.position ?? null, afterTask?.position ?? null);
+      } finally {
+        await refreshPanelBoard(panelId);
+        invalidateState();
+      }
+    }
+  );
   ipcMain.handle('task:get-details', async (_event, taskId: number) => getTaskDetails(getSettings(), taskId));
 }
 

@@ -2,9 +2,11 @@ import type {
   AppSettings,
   AuthMethod,
   ConnectionTestInput,
+  KanbanBoard,
   PanelConfig,
   PanelFilterMode,
   PanelSortMode,
+  VikunjaBucket,
   VikunjaProject,
   VikunjaTask
 } from '../../shared/types';
@@ -55,6 +57,17 @@ function mapTask(task: Record<string, unknown>): VikunjaTask {
     createdAt: task.created ? String(task.created) : null,
     updatedAt: task.updated ? String(task.updated) : null,
     position: task.position === undefined || task.position === null ? null : Number(task.position)
+  };
+}
+
+function mapBucket(bucket: Record<string, unknown>): VikunjaBucket {
+  const rawTasks = Array.isArray(bucket.tasks) ? (bucket.tasks as Record<string, unknown>[]) : [];
+  return {
+    id: Number(bucket.id),
+    title: String(bucket.title ?? ''),
+    position: Number(bucket.position ?? 0),
+    limit: Number(bucket.limit ?? 0),
+    tasks: rawTasks.map(mapTask).sort((left, right) => (left.position ?? 0) - (right.position ?? 0))
   };
 }
 
@@ -334,6 +347,64 @@ export async function renameTask(settings: AppSettings, taskId: number, title: s
 
 export async function moveTask(settings: AppSettings, taskId: number, projectId: number) {
   await updateTask(settings, taskId, { project_id: projectId });
+}
+
+async function findKanbanViewId(settings: AppSettings, projectId: number): Promise<number | null> {
+  const views = await request<Record<string, unknown>[]>(settings, `/projects/${projectId}/views`);
+  const kanbanView = views.find((view) => view.view_kind === 'kanban');
+  return kanbanView ? Number(kanbanView.id) : null;
+}
+
+export async function fetchKanbanBoard(settings: AppSettings, projectId: number): Promise<KanbanBoard | null> {
+  const viewId = await findKanbanViewId(settings, projectId);
+  if (viewId === null) {
+    return null;
+  }
+
+  const rawBuckets = await request<Record<string, unknown>[]>(settings, `/projects/${projectId}/views/${viewId}/buckets`);
+  return {
+    viewId,
+    buckets: rawBuckets.map(mapBucket).sort((left, right) => left.position - right.position)
+  };
+}
+
+export async function moveTaskToBucket(settings: AppSettings, projectId: number, viewId: number, bucketId: number, taskId: number) {
+  await request(settings, `/projects/${projectId}/views/${viewId}/buckets/${bucketId}/tasks`, {
+    method: 'POST',
+    body: JSON.stringify({ task_id: taskId })
+  });
+}
+
+// Vikunja stores kanban ordering as a float position per (task, view). Rather
+// than reassigning every task in a bucket on each reorder, we drop the moved
+// task's position at the midpoint between its new neighbors - the same
+// scheme Vikunja's own frontend uses - so only the moved task needs an
+// update. A large gap (2^16) is used at the ends so there's room to keep
+// inserting between existing tasks for a long time before anything collides.
+const POSITION_GAP = 65536;
+
+export async function reorderTaskInBucket(
+  settings: AppSettings,
+  viewId: number,
+  taskId: number,
+  beforePosition: number | null,
+  afterPosition: number | null
+) {
+  let position: number;
+  if (beforePosition === null && afterPosition === null) {
+    position = POSITION_GAP;
+  } else if (beforePosition === null) {
+    position = (afterPosition as number) - POSITION_GAP;
+  } else if (afterPosition === null) {
+    position = beforePosition + POSITION_GAP;
+  } else {
+    position = (beforePosition + afterPosition) / 2;
+  }
+
+  await request(settings, `/tasks/${taskId}/position`, {
+    method: 'POST',
+    body: JSON.stringify({ task_id: taskId, project_view_id: viewId, position })
+  });
 }
 
 function isDueToday(dateValue: string | null) {

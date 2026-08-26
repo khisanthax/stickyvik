@@ -1,4 +1,4 @@
-import type { AppSettings, PanelConfig, SyncState, VikunjaProject, VikunjaTask } from '../../shared/types';
+import type { AppSettings, KanbanBoard, PanelConfig, SyncState, VikunjaProject, VikunjaTask } from '../../shared/types';
 
 const DEFAULT_SETTINGS: AppSettings = {
   serverUrl: '',
@@ -101,6 +101,7 @@ export async function initStateStore(): Promise<void> {
       panels: [],
       projects: [],
       taskCache: {},
+      boardCache: {},
       sync: DEFAULT_SYNC
     }
   });
@@ -158,6 +159,25 @@ export function removeTaskCache(panelId: string): void {
   const cache = { ...(requireStore().get('taskCache') as Record<string, VikunjaTask[]>) };
   delete cache[panelId];
   requireStore().set('taskCache', cache);
+}
+
+export function getBoardCache(panelId: string): KanbanBoard | null {
+  const cache = requireStore().get('boardCache') as Record<string, KanbanBoard | null>;
+  return cache[panelId] ?? null;
+}
+
+export function setBoardCache(panelId: string, board: KanbanBoard | null): void {
+  const cache = requireStore().get('boardCache') as Record<string, KanbanBoard | null>;
+  requireStore().set('boardCache', {
+    ...cache,
+    [panelId]: board
+  });
+}
+
+export function removeBoardCache(panelId: string): void {
+  const cache = { ...(requireStore().get('boardCache') as Record<string, KanbanBoard | null>) };
+  delete cache[panelId];
+  requireStore().set('boardCache', cache);
 }
 
 export function getSyncState(): SyncState {

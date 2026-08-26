@@ -24,6 +24,9 @@ const bridge: StickyVikBridge = {
   toggleTaskDone: (panelId, taskId, done) => ipcRenderer.invoke('task:toggle-done', panelId, taskId, done),
   renameTask: (panelId, taskId, title) => ipcRenderer.invoke('task:rename', panelId, taskId, title),
   moveTask: (panelId, taskId, projectId) => ipcRenderer.invoke('task:move', panelId, taskId, projectId),
+  moveTaskToBucket: (panelId, taskId, bucketId) => ipcRenderer.invoke('task:move-bucket', panelId, taskId, bucketId),
+  reorderTaskInBucket: (panelId, taskId, bucketId, beforeTaskId, afterTaskId) =>
+    ipcRenderer.invoke('task:reorder', panelId, taskId, bucketId, beforeTaskId, afterTaskId),
   getTaskDetails: (taskId) => ipcRenderer.invoke('task:get-details', taskId),
   onStateInvalidated: (listener) => {
     const subscription = () => listener();

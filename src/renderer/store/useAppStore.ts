@@ -38,6 +38,8 @@ interface AppStore {
   toggleTaskDone: (panelId: string, taskId: number, done: boolean) => Promise<void>;
   renameTask: (panelId: string, taskId: number, title: string) => Promise<void>;
   moveTask: (panelId: string, taskId: number, projectId: number) => Promise<void>;
+  moveTaskToBucket: (panelId: string, taskId: number, bucketId: number) => Promise<void>;
+  reorderTaskInBucket: (panelId: string, taskId: number, bucketId: number, beforeTaskId: number | null, afterTaskId: number | null) => Promise<void>;
   getTaskDetails: (taskId: number) => Promise<VikunjaTask>;
 }
 
@@ -156,6 +158,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
   moveTask: async (panelId, taskId, projectId) => {
     await window.stickyVik.moveTask(panelId, taskId, projectId);
+    await get().refresh();
+  },
+  moveTaskToBucket: async (panelId, taskId, bucketId) => {
+    await window.stickyVik.moveTaskToBucket(panelId, taskId, bucketId);
+    await get().refresh();
+  },
+  reorderTaskInBucket: async (panelId, taskId, bucketId, beforeTaskId, afterTaskId) => {
+    await window.stickyVik.reorderTaskInBucket(panelId, taskId, bucketId, beforeTaskId, afterTaskId);
     await get().refresh();
   },
   getTaskDetails: (taskId) => window.stickyVik.getTaskDetails(taskId)
